@@ -3,12 +3,8 @@ import ross as rs
 import numpy as np
 from scipy import linalg as la
 import sys
-# import pandas as pd
 import plotly.graph_objects as go
-# import plotly.express as px
-# from xlwings import Book
-# import cv2
-# import glob
+
 
 class RotorMTM:
 

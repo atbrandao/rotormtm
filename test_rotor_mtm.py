@@ -3,6 +3,7 @@ import ross as rs
 import numpy as np
 
 Nel = 30
+
 shaft = [
     rs.ShaftElement(
         n=i,
