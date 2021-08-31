@@ -53,7 +53,7 @@ for i in i_ls:
             fig = rmtm.plot_camp_heatmap(r, None, sp_arr, f_min=f_min, colorbar_title='Response (m)')
             fig.update_layout(yaxis=dict(range=[f_min, sp_arr[-1]]),title='Response heatmap')
             fig.write_image(f'results/camp_heatmap_solo.pdf')
-            r = np.log10(data['r_b_map'])
+            r = np.log10(data['rsolo_b_map'])
             fig = rmtm.plot_camp_heatmap(r, None, sp_arr, f_min=f_min, colorbar_title='Response (log)')
             fig.update_layout(yaxis=dict(range=[f_min, sp_arr[-1]]),title='Response heatmap')
             fig.write_image(f'results/camp_heatmap_log_solo.pdf')
