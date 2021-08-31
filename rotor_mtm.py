@@ -406,7 +406,7 @@ class RotorMTM:
         return out
 
 
-def plot_diff_modal(w, diff, sp_arr, mode='abs',n_plot=None,saturate=None):
+def plot_diff_modal(w, diff, sp_arr, mode='abs',n_plot=None,saturate=None, colorbar_left=False):
 
 
 
@@ -501,7 +501,7 @@ def plot_diff_modal(w, diff, sp_arr, mode='abs',n_plot=None,saturate=None):
                                     size=15),
                           legend=dict(xanchor='center', x=0.5, yanchor='bottom',
                                       y=1, orientation='h'))
-        if mode == 'abs':
+        if mode == 'abs' and colorbar_left:
             fig.update_layout(coloraxis_colorbar_x=-0.15)
     else:
         scene = dict(zaxis={'range': [0, sp_arr[-1]],
