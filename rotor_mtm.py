@@ -538,34 +538,43 @@ def plot_diff_modal(w, diff, sp_arr, mode='abs',n_plot=None,saturate=None, color
 
     return fig
 
-def plot_camp_heatmap(r, w, sp_arr, w_res=None, colorbar_title='Response (log)'):
+def plot_camp_heatmap(r, w, sp_arr, w_res=None, colorbar_title='Response (log)',
+                      saturate_min=None,f_min=None):
 
     w_max = sp_arr[-1]
     w_min = sp_arr[0]
+
+    if f_min is None:
+        i_min = 0
+    else:
+        i_min = np.argmin(np.abs(sp_arr-f_min))
 
     if w_res != None:
         data_res = [go.Scatter(x=[sp_arr[a] for a in range(len(sp_arr)) if len(w_res[a]) > b],
                                y=[w_res[a][b] for a in range(len(sp_arr)) if len(w_res[a]) > b], mode='markers',
                                marker={'color': 'grey', 'size': 2.5, 'line': dict(width=0.05)},
                                marker_symbol='x-thin', showlegend=False) for b in
-                    range(max([len(c) for c in w_res]))]
+                    range(max([len(c) for c in w_res]))] + \
+                   [go.Scatter(x=[w_max, w_max + 1], y=[w_max, w_max + 1], mode='markers', marker_symbol='x-thin',
+                              marker={'color': 'grey', 'size': 2.5, 'line': dict(width=0.5)},
+                              name='Resonator frequencies')]
     else:
         data_res = []
+    data = [go.Heatmap(x=sp_arr, y=sp_arr[i_min:], z=r[i_min:,:], colorbar=dict(title=colorbar_title),
+                      zmin=saturate_min,zmax=np.max(r)),
+            go.Scatter(x=[0, w_max], y=[0, w_max], mode='lines', line={'dash': 'dash', 'color': 'black'},
+                       name='Synch. Frequency',showlegend=True)]
 
-    fig = go.Figure(
-        data=[go.Heatmap(x=sp_arr, y=sp_arr, z=np.log10(np.abs(r)), colorbar=dict(title=colorbar_title))] + \
-             [go.Scatter(x=[sp_arr[a] for a in range(len(sp_arr)) if len(w[a]) > b],
-                         y=[w[a][b] for a in range(len(sp_arr)) if len(w[a]) > b], mode='markers',
-                         marker={'color': 'black', 'size': 3}, showlegend=False) for b in range(max([len(c) for c in w]))] + \
-             data_res + \
-             [go.Scatter(x=[0, w_max], y=[0, w_max], mode='lines', line={'dash': 'dash', 'color': 'blue'},
-                         name='Synch. Frequency'),
-              go.Scatter(x=[w_max, w_max + 1], y=[w_max, w_max + 1], mode='markers', marker_symbol='x-thin',
-                         marker={'color': 'grey', 'size': 2.5, 'line': dict(width=0.5)},
-                         name='Resonator frequencies'),
-              go.Scatter(x=[w_max, w_max + 1], y=[w_max, w_max + 1], mode='markers', marker={'color': 'black'},
-                         name='Rotor frequencies'),
-              ], )
+    if w:
+        data += [go.Scatter(x=[sp_arr[a] for a in range(len(sp_arr)) if len(w[a]) > b],
+                         y=[w[a][b] for a in range(len(sp_arr)) if len(w[a]) > b], mode='markers',marker_symbol='x-thin',
+                         marker={'color': 'black', 'size': 3}, showlegend=False) for b in range(max([len(c) for c in w]))]
+        data += data_res
+        data += [go.Scatter(x=[w_max, w_max + 1], y=[w_max, w_max + 1], mode='markers', marker={'color': 'black'},
+                         name='Rotor frequencies',marker_symbol='x-thin',)]
+
+
+    fig = go.Figure(data=data)
     fig.update_layout(title={'xanchor': 'center',
                              'x': 0.4,
                              'font': {'family': 'Arial, bold',
@@ -584,7 +593,7 @@ def plot_camp_heatmap(r, w, sp_arr, w_res=None, colorbar_title='Response (log)')
                       font=dict(family="Calibri, bold",
                                 size=15),
                       legend=dict(xanchor='center', x=0.5, yanchor='bottom',
-                                  y=1, orientation='h'))
+                                  y=1.02, orientation='h'))
     return fig
 
 
