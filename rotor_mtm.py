@@ -380,7 +380,8 @@ class RotorMTM:
 
         out = dict(ws=ws,
                    w=w,
-                   w_res=w_res)
+                   w_res=w_res,
+                   sp_arr=sp_arr)
         if heatmap:
             out.update(dict(rsolo_map=np.array(rsolo_map).reshape((len(sp_arr), len(sp_arr))),
                             rsolo_b_map=np.array(rsolo_b_map).reshape((len(sp_arr), len(sp_arr))),
