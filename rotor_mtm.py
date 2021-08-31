@@ -409,7 +409,10 @@ class RotorMTM:
 
 def plot_diff_modal(w, diff, sp_arr, mode='abs',n_plot=None,saturate=None, colorbar_left=False):
 
-
+    if saturate:
+        leg_add = f' (sat. 10)'
+    else:
+        leg_add = ''
 
     if mode == 'abs':
         
@@ -423,7 +426,7 @@ def plot_diff_modal(w, diff, sp_arr, mode='abs',n_plot=None,saturate=None, color
                                text=[f'{a} {i}' for i in range(len(w[a]))],
                                marker={'color': (np.mean(np.abs(diff[a]), 1)),
                                         'colorscale':["blue", "purple", "yellow"],
-                                       'colorbar': dict(title=(['Amplification (log)'] + [None] * (len(sp_arr) - 1))[a],
+                                       'colorbar': dict(title=(['Amplific.'+leg_add] + [None] * (len(sp_arr) - 1))[a],
                                                         x=([x0] + [None] * (len(sp_arr) - 1))[a],),
                                        'size': 3,
                                         'cmin': 0,
@@ -434,7 +437,7 @@ def plot_diff_modal(w, diff, sp_arr, mode='abs',n_plot=None,saturate=None, color
             data = []
             for n in range(n_plot):
                 if n == 0:
-                    colorbar =(['Amplification (log)'] + [None] * (len(sp_arr) - 1))
+                    colorbar =(['Amplific.'+leg_add] + [None] * (len(sp_arr) - 1))
                 else:
                     colorbar = [None] * (len(sp_arr))
                 data += [go.Scatter3d(y=[n] * len(w), x=[sp_arr[a]] * len(w),
