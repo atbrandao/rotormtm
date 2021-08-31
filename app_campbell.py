@@ -207,7 +207,7 @@ def update_campbell(select_rotor,select_coord):
         fig3 = figure=make_subplots(rows=1, cols=2, )
     else:
         out = rotor_dict[select_rotor].run_analysis(sp_arr,diff_lim=1e10,diff_analysis=True,dof=select_coord)
-        fig1 = rmtm.plot_diff_modal(out['w'],out['diff'],sp_arr,mode='abs')
+        fig1 = rmtm.plot_diff_modal(out['w'],out['diff'],sp_arr,mode='abs',colorbar_left=True)
         fig2 = rmtm.plot_diff_modal(out['w'],out['diff'],sp_arr,mode='phase')
         # fig3 = [dcc.Graph(figure=fig1),
         #         dcc.Graph(figure=fig2)]
