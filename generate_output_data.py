@@ -73,7 +73,7 @@ diff_lim = 1e9
 
 rotor_dict = dict(
 # Rotores com ressonadores flexurais
-# r_det_flextun = rmtm.RotorMTM(rotor,n_pos,dk_r,k0*100,k1,var=0,var_k=0,p_damp=1e-4,ge=True),
+r_det_flextun = rmtm.RotorMTM(rotor,n_pos,dk_r,k0*100,k1,var=0,var_k=0,p_damp=1e-4,ge=True),
 r_var_flextun = rmtm.RotorMTM(rotor,n_pos,dk_r,k0*100,k1,var=var,var_k=0,p_damp=1e-4,ge=True,exp_var=3),
 r_var3_flextun = rmtm.RotorMTM(rotor,n_pos,dk_r,k0*100,k1,var=var,var_k=0,p_damp=1e-4,ge=True,exp_var=3),
 # Rotores com ressonadores translacionais
@@ -91,12 +91,20 @@ def save_full_out(k):
         dof = 2 # Select the flexural DoF to calculate diff
     else:
         dof = 0 # Select the translation DoF to calculate diff
-    out = rotor_dict[k].run_analysis(sp_arr, diff_lim=diff_lim, diff_analysis=True, heatmap=True, dof=dof)
-    with open(f'out_data_{k}.pic', 'wb') as handle:
+    out = rotor_dict[k].run_analysis(sp_arr, diff_lim=diff_lim, diff_analysis=True,
+                                     heatmap=True, dof=dof, dof_show=dof_show)
+
+    with open(f'out_data_{k}_{dof_show}.pic', 'wb') as handle:
         pickle.dump(out, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
+dof_show = 0
 if __name__ == '__main__':
     with Pool(7) as p:
         p.map(save_full_out,list(rotor_dict.keys()))
+
+dof_show = 2
+if __name__ == '__main__':
+    with Pool(2) as p:
+        p.map(save_full_out,list(rotor_dict.keys())[:3:2])
 
 
