@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 files = glob.glob('results/*.pic')
 print(files)
 
-i_ls = [0,1,3,4,5,6]
+i_ls = [0,1,3,4,5,6,9]
 
 sp_arr = np.linspace(1,800,200)
 for i in i_ls:
