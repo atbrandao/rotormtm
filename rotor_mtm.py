@@ -406,7 +406,9 @@ class RotorMTM:
         return out
 
 
-def plot_diff_modal(w, diff, sp_arr, mode='abs',n_plot=None):
+def plot_diff_modal(w, diff, sp_arr, mode='abs',n_plot=None,saturate=None):
+
+
 
     if mode == 'abs':
         
@@ -419,8 +421,8 @@ def plot_diff_modal(w, diff, sp_arr, mode='abs',n_plot=None):
                                        'colorbar': dict(title=(['Amplification (log)'] + [None] * (len(sp_arr) - 1))[a],
                                                         x=([-0.2] + [None] * (len(sp_arr) - 1))[a],),
                                        'size': 3,
-                                        # 'cmin': 0,
-                                        # 'cmax': 100
+                                        'cmin': 0,
+                                        'cmax': saturate
                                        },
                                showlegend=False) for a in range(len(sp_arr))]
         else:
@@ -437,8 +439,8 @@ def plot_diff_modal(w, diff, sp_arr, mode='abs',n_plot=None):
                                         'colorscale':["blue", "purple", "yellow"],
                                        'colorbar': dict(title=colorbar[a]),
                                        'size': 3,
-                                        'cmin': np.log10(np.min(np.abs(diff))),
-                                        'cmax': 3.5#np.log10(np.max(np.abs(diff)))
+                                        'cmin': 0, #np.log10(np.min(np.abs(diff))),
+                                        'cmax': saturate #3.5#np.log10(np.max(np.abs(diff)))
                                        },
                                showlegend=False) for a in range(len(sp_arr))]
     if mode == 'phase':
@@ -450,8 +452,8 @@ def plot_diff_modal(w, diff, sp_arr, mode='abs',n_plot=None):
                                        # 'colorscale':'spectral',
                                        'colorbar': dict(title=(['Phase (rad)'] + [None] * (len(sp_arr) - 1))[a],),
                                        'size': 3,
-                                       # 'cmin': 0,
-                                       # 'cmax': 10
+                                       'cmin': 0,
+                                       'cmax': np.pi
                                        },
                                showlegend=False) for a in range(len(sp_arr))]
             
