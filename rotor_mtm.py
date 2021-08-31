@@ -413,13 +413,17 @@ def plot_diff_modal(w, diff, sp_arr, mode='abs',n_plot=None,saturate=None, color
     if mode == 'abs':
         
         if n_plot is None:
+            if colorbar_left:
+                x0 = -0.2
+            else:
+                x0 = None
             data = [go.Scatter(x=[sp_arr[a]] * len(w),
                                y=w[a], mode='markers',
                                text=[f'{a} {i}' for i in range(len(w[a]))],
-                               marker={'color': np.log10(np.mean(np.abs(diff[a]), 1)),
+                               marker={'color': (np.mean(np.abs(diff[a]), 1)),
                                         'colorscale':["blue", "purple", "yellow"],
                                        'colorbar': dict(title=(['Amplification (log)'] + [None] * (len(sp_arr) - 1))[a],
-                                                        x=([-0.2] + [None] * (len(sp_arr) - 1))[a],),
+                                                        x=([x0] + [None] * (len(sp_arr) - 1))[a],),
                                        'size': 3,
                                         'cmin': 0,
                                         'cmax': saturate
@@ -435,7 +439,7 @@ def plot_diff_modal(w, diff, sp_arr, mode='abs',n_plot=None,saturate=None, color
                 data += [go.Scatter3d(y=[n] * len(w), x=[sp_arr[a]] * len(w),
                                z=w[a], mode='markers',
                                text=(np.abs(diff[a])[:,n]),
-                               marker={'color': np.log10(np.abs(diff[a])[:,n]),
+                               marker={'color': (np.abs(diff[a])[:,n]),
                                         'colorscale':["blue", "purple", "yellow"],
                                        'colorbar': dict(title=colorbar[a]),
                                        'size': 3,
