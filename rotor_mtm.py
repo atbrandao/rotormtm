@@ -716,7 +716,7 @@ def plot_deflected_shape(rotor,y,n_pos,dof,plot_orbits=None,ys=None):
     N = len(l)
     
     if plot_orbits == None:
-        plot_orbits = [0,int(N1/2),N1-1]
+        plot_orbits = np.arange(0,N1,N1//10)
         
     data_res = [go.Scatter3d(x=[rotor.nodes_pos[i] for i in n_pos],
                              z=np.real(y[dof+4*N1+1::4]).reshape((N2)),
