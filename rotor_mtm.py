@@ -597,6 +597,50 @@ def plot_camp_heatmap(r, w, sp_arr, w_res=None, colorbar_title='Response (log)',
     return fig
 
 
+def plot_campbell(w, sp_arr, f_min=None):
+
+    w_max = sp_arr[-1]
+    w_min = sp_arr[0]
+
+    if f_min is None:
+        i_min = 0
+    else:
+        i_min = np.argmin(np.abs(sp_arr-f_min))
+
+    data = [go.Scatter(x=[0, w_max], y=[0, w_max], mode='lines', line={'dash': 'dash', 'color': 'black'},
+                       name='Synch. Frequency',showlegend=True)]
+
+    if w:
+        data += [go.Scatter(x=[sp_arr[a] for a in range(len(sp_arr)) if len(w[a]) > b],
+                         y=[w[a][b] for a in range(len(sp_arr)) if len(w[a]) > b], mode='markers',
+                         marker={'color': 'black', 'size': 3}, showlegend=False) for b in range(max([len(c) for c in w]))]
+
+        data += [go.Scatter(x=[w_max, w_max + 1], y=[w_max, w_max + 1], mode='markers', marker={'color': 'black'},
+                         name='Natural frequencies',)]
+
+
+    fig = go.Figure(data=data)
+    fig.update_layout(title={'xanchor': 'center',
+                             'x': 0.4,
+                             'font': {'family': 'Arial, bold',
+                                      'size': 15},
+                             'text': f'Campbell Diagram'},
+                      yaxis={'range': [w_min, w_max],
+                             'dtick': 50,
+                             "gridcolor": "rgb(159, 197, 232)",
+                             "zerolinecolor": "rgb(74, 134, 232)"},
+                      xaxis={'range': [w_min, sp_arr[-1]],
+                             'dtick': 50,
+                             "gridcolor": "rgb(159, 197, 232)",
+                             "zerolinecolor": "rgb(74, 134, 232)"},
+                      xaxis_title='Speed (rad/s)',
+                      yaxis_title='Natural frequencies (rad/s)',
+                      font=dict(family="Calibri, bold",
+                                size=15),
+                      legend=dict(xanchor='center', x=0.5, yanchor='bottom',
+                                  y=1.02, orientation='h'))
+    return fig
+
 def plot_frf(r, sp_arr):
     
     rsolo = r[0]
