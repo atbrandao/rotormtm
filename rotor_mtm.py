@@ -242,11 +242,11 @@ class RotorMTM:
 
         return omg_list, omg_list_res, u_list, u_list_res, csi_list, csi_list_res, diff_list, diff_list_res
 
-    def x_out(self, sp, f, unb_node=0):
+    def x_out(self, sp, f, unb_node=0, rotor_solo=False):
 
-        H, Minv = self.calc_H(sp, f)
+        H, Minv = self.calc_H(sp, f, rotor_solo)
 
-        N = self.N
+        N = len(H)
 
         F = np.zeros((2 * N, 1)).astype(complex)
         F[N + 4 * unb_node] = 1
