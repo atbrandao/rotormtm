@@ -700,7 +700,7 @@ def res_diff(x, n_pos, cross_prod=False, energy=False):
     return diff
 
 
-def plot_deflected_shape(rotor,y,n_pos,dof,plot_orbits=None,ys=None):
+def plot_deflected_shape(rotor,y,n_pos,dof,plot_orbits=None,ys=None,isometric=False):
     
     if dof == 'trans':
         dof = 0
@@ -708,6 +708,11 @@ def plot_deflected_shape(rotor,y,n_pos,dof,plot_orbits=None,ys=None):
     elif dof == 'flex':
         dof = 2
         un = 'rad'
+
+    if isometric:
+        trace_function = scat_iso_2d
+    else:
+        trace_function = go.Scatter3d
     
     N2 = len(n_pos)
     N1 = rotor.ndof//4
@@ -716,16 +721,16 @@ def plot_deflected_shape(rotor,y,n_pos,dof,plot_orbits=None,ys=None):
     N = len(l)
     
     if plot_orbits == None:
-        plot_orbits = np.arange(0,N1,N1//10)
+        plot_orbits = np.arange(0,N1,N1//5)
         
-    data_res = [go.Scatter3d(x=[rotor.nodes_pos[i] for i in n_pos],
+    data_res = [trace_function(x=[rotor.nodes_pos[i] for i in n_pos],
                              z=np.real(y[dof+4*N1+1::4]).reshape((N2)),
                              y=np.real(y[dof+4*N1::4]).reshape((N2)),
                              mode='markers',marker={'size':2,'color':'red'},
                              legendgroup='res',name='Resonators')]
     
     for i in range(N2):
-        data_res.append(go.Scatter3d(x=np.ones(2)*rotor.nodes_pos[n_pos[i]],
+        data_res.append(trace_function(x=np.ones(2)*rotor.nodes_pos[n_pos[i]],
                                      z=np.linspace(np.real(y[dof+4*n_pos[i]+1]),np.real(y[dof+4*N1+4*i+1]),2).reshape((2)),
                                      y=np.linspace(np.real(y[dof+4*n_pos[i]]),np.real(y[dof+4*N1+4*i]),2).reshape((2)),
                                      mode='lines',line={'color':'red','width':2},
@@ -737,7 +742,7 @@ def plot_deflected_shape(rotor,y,n_pos,dof,plot_orbits=None,ys=None):
     t = np.arange(0,2*np.pi*0.95,np.pi/15)
     for i, p in enumerate(plot_orbits):
                     
-        data_orbits.append(go.Scatter3d(x=[rotor.nodes_pos[p]]*len(t),
+        data_orbits.append(trace_function(x=[rotor.nodes_pos[p]]*len(t),
                                         z=np.abs(y[dof+4*p+1])*np.cos(t+np.angle(y[dof+4*p+1])),
                                         y=np.abs(y[dof+4*p])*np.cos(t+np.angle(y[dof+4*p])),
                                         mode = 'lines',
@@ -750,7 +755,7 @@ def plot_deflected_shape(rotor,y,n_pos,dof,plot_orbits=None,ys=None):
             
         if p in n_pos:
             p2 = N1 + np.argmin([np.abs(a-p) for a in n_pos])
-            data_orbits.append(go.Scatter3d(x=[rotor.nodes_pos[n_pos[p2-N1]]]*len(t),
+            data_orbits.append(trace_function(x=[rotor.nodes_pos[n_pos[p2-N1]]]*len(t),
                                             z=np.abs(y[dof+4*p2+1])*np.cos(t+np.angle(y[dof+4*p2+1])),
                                             y=np.abs(y[dof+4*p2])*np.cos(t+np.angle(y[dof+4*p2])),
                                             mode = 'lines',
@@ -765,20 +770,24 @@ def plot_deflected_shape(rotor,y,n_pos,dof,plot_orbits=None,ys=None):
     max_ys = 0
     if type(ys) != type(None):
         max_ys = max(np.max(np.abs(ys[dof:N1*4:4])),np.max(np.abs(ys[dof+1:N1*4:4])))
-        data_solo.append(go.Scatter3d(x=l,z=np.real(ys[dof+1:4*N1:4]).reshape((N1)),
+        data_solo.append(trace_function(x=l,z=np.real(ys[dof+1:4*N1:4]).reshape((N1)),
                                        y=np.real(ys[dof:4*N1:4]).reshape((N1)),
                                        mode='lines',line={'width':2,'color':'black'},name='Rotor solo'),)
     
     
-    fig = go.Figure(data=[go.Scatter3d(x=l,z=np.real(y[dof+1:4*N1:4]).reshape((N1)),
+    fig = go.Figure(data=[trace_function(x=l,z=np.real(y[dof+1:4*N1:4]).reshape((N1)),
                                        y=np.real(y[dof:4*N1:4]).reshape((N1)),mode='lines',line={'width':5},name='Deflected shape'),
-                          go.Scatter3d(x=l,z=[0]*len(l),y=[0]*len(l),name='Neutral line',showlegend=False,
+                          trace_function(x=l,z=[0]*len(l),y=[0]*len(l),name='Neutral line',showlegend=False,
                                        mode='lines',line={'width':1,'color':'black','dash':'dash'}),                          
                           ]+data_orbits+data_res+data_solo)
     max_x = max((np.max(np.abs(y[dof::4])),np.max(np.abs(y[dof+1::4])),max_ys))
     
-    
-    fig.update_layout(scene=dict(yaxis={'range':[2*-max_x,2*max_x],
+    if isometric:
+        fig.update_layout(scene=dict(yaxis={'range': [2 * -max_x, 2 * max_x],
+                                            'title': f'X [{un}]'},
+                                     xaxis={'title': 'Axial position [m]'}, ))
+    else:
+        fig.update_layout(scene=dict(yaxis={'range':[2*-max_x,2*max_x],
                                         'title':f'X [{un}]'},
                                  zaxis={'range':[2*-max_x,2*max_x],
                                         'title':f'Y [{un}]'},
@@ -786,3 +795,19 @@ def plot_deflected_shape(rotor,y,n_pos,dof,plot_orbits=None,ys=None):
     
     return fig
 
+def scat_iso_2d(x,y,z,mode,name=None,showlegend=True,legendgroup=None,line=None,marker=None):
+
+    x = np.array(x)
+    y = np.array(y)
+    z = np.array(z)
+
+    y_iso = 0.0 * y
+    x_iso = 0.0 * x
+
+    y_iso += z - y * np.sin(np.pi/6) - x * np.sin(np.pi/6)
+    x_iso += y * np.cos(np.pi / 6) - x * np.cos(np.pi / 6)
+
+    scat = go.Scatter(x=x_iso, y=y_iso, mode=mode, name=name, showlegend=showlegend,
+                      legendgroup=legendgroup, line=line, marker=marker)
+
+    return scat
