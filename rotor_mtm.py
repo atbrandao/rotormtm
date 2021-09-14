@@ -740,7 +740,7 @@ def plot_deflected_shape(rotor,y,n_pos,dof,plot_orbits=None,ys=None,isometric=Fa
     N = len(l)
     
     if plot_orbits == None:
-        plot_orbits = np.arange(0,N1,N1//5)
+        plot_orbits = np.arange(0,N1,N1//9)
         
     data_res = [trace_function(x=[rotor.nodes_pos[i] for i in n_pos],
                              z=np.real(y[dof+4*N1+1::4]).reshape((N2)),
