@@ -30,32 +30,32 @@ for i in i_ls:
 
         r = (data['r_b_map'])
         fig = rmtm.plot_camp_heatmap(r, None, sp_arr,f_min=f_min,colorbar_title='Response [m]')
-        fig.update_layout(yaxis=dict(range=[f_min,sp_arr[-1]]),title='Response heatmap')
+        fig.update_layout(yaxis=dict(range=[f_min,sp_arr[-1]],title='Excitation Frequency (Hz)'),title='Response heatmap')
         fig.write_image(f'results/camp_heatmap_{name}.pdf')
         r = np.log10(data['r_b_map'])
         fig = rmtm.plot_camp_heatmap(r, None, sp_arr, f_min=f_min, colorbar_title='Response (log [m])')
-        fig.update_layout(yaxis=dict(range=[f_min, sp_arr[-1]]),title='Response heatmap')
+        fig.update_layout(yaxis=dict(range=[f_min, sp_arr[-1]],title='Excitation Frequency (Hz)'),title='Response heatmap')
         fig.write_image(f'results/camp_heatmap_log_{name}.pdf')
 
         if 'trans' in name or ('flex' in name and '2' in name):
             r = np.mean(np.angle(np.array(data['diff_map_b'])),axis=2)
             fig = rmtm.plot_camp_heatmap(r, None, sp_arr, f_min=f_min, colorbar_title='Phase (rad)')
-            fig.update_layout(yaxis=dict(range=[f_min, sp_arr[-1]]),title='Average resonator phase angle heatmap')
+            fig.update_layout(yaxis=dict(range=[f_min, sp_arr[-1]],title='Excitation Frequency (Hz)'),title='Average resonator phase angle heatmap')
             fig.write_image(f'results/camp_diff_heatmap_phase_{name}.pdf')
             r = np.log10(np.mean(np.abs(np.array(data['diff_map_b'])),axis=2))
             fig = rmtm.plot_camp_heatmap(r, None, sp_arr, f_min=f_min, colorbar_title='Amplific. (log)')
-            fig.update_layout(yaxis=dict(range=[f_min, sp_arr[-1]]),title='Average resonator amplification heatmap')
+            fig.update_layout(yaxis=dict(range=[f_min, sp_arr[-1]],title='Excitation Frequency (Hz)'),title='Average resonator amplification heatmap')
             fig.write_image(f'results/camp_diff_heatmap_abs_{name}.pdf')
 
         # Plot results for solo rotor
         if i == 0:
             r = (data['rsolo_b_map'])
             fig = rmtm.plot_camp_heatmap(r, None, sp_arr, f_min=f_min, colorbar_title='Response (m)')
-            fig.update_layout(yaxis=dict(range=[f_min, sp_arr[-1]]),title='Response heatmap')
+            fig.update_layout(yaxis=dict(range=[f_min, sp_arr[-1]],title='Excitation Frequency (Hz)'),title='Response heatmap')
             fig.write_image(f'results/camp_heatmap_solo.pdf')
             r = np.log10(data['rsolo_b_map'])
             fig = rmtm.plot_camp_heatmap(r, None, sp_arr, f_min=f_min, colorbar_title='Response (log)')
-            fig.update_layout(yaxis=dict(range=[f_min, sp_arr[-1]]),title='Response heatmap')
+            fig.update_layout(yaxis=dict(range=[f_min, sp_arr[-1]],title='Excitation Frequency (Hz)'),title='Response heatmap')
             fig.write_image(f'results/camp_heatmap_log_solo.pdf')
 
 
