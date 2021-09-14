@@ -246,13 +246,13 @@ class RotorMTM:
 
         H, Minv = self.calc_H(sp, f, rotor_solo)
 
-        N = len(H)
+        N = len(H) // 2
 
-        F = np.zeros((N, 1)).astype(complex)
+        F = np.zeros((2 * N, 1)).astype(complex)
         F[N + 4 * unb_node] = 1
         F[N + 4 * unb_node + 1] = -1.j
 
-        F_b = np.zeros((N, 1)).astype(complex)
+        F_b = np.zeros((2 * N, 1)).astype(complex)
         F_b[N + 4 * unb_node] = 1
         F_b[N + 4 * unb_node + 1] = 1.j
 
