@@ -242,6 +242,25 @@ class RotorMTM:
 
         return omg_list, omg_list_res, u_list, u_list_res, csi_list, csi_list_res, diff_list, diff_list_res
 
+    def x_out(self, sp, f, unb_node=0):
+
+        H, Minv = self.calc_H(sp, f)
+
+        N = self.N
+
+        F = np.zeros((2 * N, 1)).astype(complex)
+        F[N + 4 * unb_node] = 1
+        F[N + 4 * unb_node + 1] = -1.j
+
+        F_b = np.zeros((2 * N, 1)).astype(complex)
+        F_b[N + 4 * unb_node] = 1
+        F_b[N + 4 * unb_node + 1] = 1.j
+
+        y = H @ (Minv @ F)
+        y_b = H @ (Minv @ F_b)
+
+        return y[:N], y_b[:N]
+
     def run_analysis(self, sp_arr, n_modes=50, dof=0, dof_show=0, diff_lim=5,unb_node=0,probe_node=None,
                      heatmap=False, diff_analysis=False, cross_prod=False, energy=False):
 
@@ -804,8 +823,8 @@ def scat_iso_2d(x,y,z,mode,name=None,showlegend=True,legendgroup=None,line=None,
     y_iso = 0.0 * y
     x_iso = 0.0 * x
 
-    y_iso += z - y * np.sin(np.pi/6) - x * np.sin(np.pi/6)
-    x_iso += y * np.cos(np.pi / 6) - x * np.cos(np.pi / 6)
+    y_iso += z - y * np.sin(np.pi/6) + x * np.sin(np.pi/6)
+    x_iso += y * np.cos(np.pi / 6) + x * np.cos(np.pi / 6)
 
     scat = go.Scatter(x=x_iso, y=y_iso, mode=mode, name=name, showlegend=showlegend,
                       legendgroup=legendgroup, line=line, marker=marker)
