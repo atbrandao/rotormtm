@@ -672,8 +672,8 @@ def plot_frf(r, sp_arr):
     min_y = min_y - 0.1*np.abs(min_y)
     fig = go.Figure(data=[go.Scatter(x=sp_arr,y=np.log10(rsolo[:,0]),name='Solo rotor'),
                           go.Scatter(x=sp_arr,y=np.log10(r_det[:,0]),name='Ressonators'),
-                          go.Scatter(x=sp_arr,y=np.log10(r_var[:,0]),name='Ressonators + variability'),
-                          go.Scatter(x=[375,375],y=[min_y,max_y],
+                          go.Scatter(x=sp_arr,y=np.log10(r_var[:,0]),name='Rainbow Ressonators'),
+                          go.Scatter(x=[377,377],y=[min_y+10,max_y-10],
                                     mode='lines',line={'color':'black','dash':'dash','width':1},name='Target frequency'),
                           # go.Scatter(x=[f_1,f_1],y=[min_y,max_y],
                           #            mode='lines',line={'color':'red','dash':'dash','width':1},name='f1'),
@@ -688,13 +688,13 @@ def plot_frf(r, sp_arr):
                              "gridcolor": "rgb(159, 197, 232)",
                              "zerolinecolor": "rgb(74, 134, 232)"},
                       xaxis={'range':[0,sp_arr[-1]],
-                             'dtick':50,
+                             'dtick':100,
                              "gridcolor": "rgb(159, 197, 232)",
                              "zerolinecolor": "rgb(74, 134, 232)"},
                       xaxis_title='Frequency (rad/s)',                  
                       yaxis_title='$log_{10}(M_{ax})$',
                       font=dict(family="Calibri, bold",
-                            size=15))
+                            size=18))
     return fig
 
 def res_diff(x, n_pos, cross_prod=False, energy=False):
