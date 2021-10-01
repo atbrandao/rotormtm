@@ -154,9 +154,9 @@ class RotorMTM:
 
         return A
 
-    def plot_rotor(self):
+    def plot_rotor(self,*args):
 
-        return self.rotor_solo_disks.plot_rotor()
+        return self.rotor_solo_disks.plot_rotor(*args)
 
     def calc_H(self,sp,f,rotor_solo=False):#K, C, G, M, sp):
 
