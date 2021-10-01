@@ -5,16 +5,51 @@ import numpy as np
 import plotly.graph_objects as go
 
 files = glob.glob('results/*.pic')
-print(files)
+for i, f in enumerate(files):
+    print(f'{i} - {f}')
 
 i_ls = [0,1,3,4,5,6,7]
+i_ls_frf = [0,3]
 
 sp_arr = np.linspace(1,800,200)
+N = len(sp_arr)
+
+for i in i_ls_frf:
+    with open(files[i],'rb') as f:
+        data = pickle.load(f)
+        name = os.path.split(files[i])[1][11:-4]
+
+        r = [np.array([data['rsolo_map'][j,j] for j in range(N)]).reshape(N,1),
+             np.array([data['r_map'][j,j] for j in range(N)]).reshape(N,1)]
+        r_b = [np.array([data['rsolo_b_map'][j, j] for j in range(N)]).reshape(N,1),
+             np.array([data['r_b_map'][j, j] for j in range(N)]).reshape(N,1)]
+
+    if 'flex' in files[i]:
+        str_sub = 'var3'
+        fname = 'flex'
+    else:
+        str_sub = 'var1'
+        fname = 'lin'
+    with open(files[i].replace('det',str_sub),'rb') as f:
+        data = pickle.load(f)
+        name = os.path.split(files[i])[1][11:-4]
+
+        r.append(np.array([data['r_map'][j,j] for j in range(N)]).reshape(N,1))
+        r_b.append(np.array([data['r_b_map'][j, j] for j in range(N)]).reshape(N,1))
+
+    fig = rmtm.plot_frf(r,sp_arr)
+    fig.update_layout(yaxis=dict(range=[-8,-4.5]))
+    fig.write_image(f'Forward_excitation_{fname}.pdf')
+    fig = rmtm.plot_frf(r_b, sp_arr)
+    fig.update_layout(yaxis=dict(range=[-8, -4.5]))
+    fig.write_image(f'Backward_excitation_{fname}.pdf')
+
 for i in i_ls:
     with open(files[i],'rb') as f:
         f_min = 40
         data = pickle.load(f)
         name = os.path.split(files[i])[1][11:-4]
+
         fig = rmtm.plot_diff_modal(data['w'], data['diff'], sp_arr, mode='abs', saturate=10)
         fig.add_trace(go.Scatter(x=sp_arr,y=sp_arr,mode='lines',
                                  line=dict(dash='dash',color='black'),
