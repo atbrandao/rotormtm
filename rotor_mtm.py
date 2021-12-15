@@ -515,28 +515,28 @@ def plot_diff_modal(w, diff, sp_arr, mode='abs',n_plot=None,saturate=None, color
                                           'size': 15},
                                   'text': f'Campbell Diagram'},
                           yaxis={'range': [0, sp_arr[-1]],
-                            'dtick': 50,
+                            'dtick': 100,
                             "gridcolor": "rgb(159, 197, 232)",
                             "zerolinecolor": "rgb(74, 134, 232)"},
                         xaxis={'range': [0, sp_arr[-1]],
-                                'dtick': 50,
+                                'dtick': 100,
                                 "gridcolor": "rgb(159, 197, 232)",
                                 "zerolinecolor": "rgb(74, 134, 232)"},
                           xaxis_title='Speed (rad/s)',
                           yaxis_title='Natural frequencies (rad/s)',
                           font=dict(family="Calibri, bold",
-                                    size=15),
+                                    size=18),
                           legend=dict(xanchor='center', x=0.5, yanchor='bottom',
                                       y=1, orientation='h'))
         if mode == 'abs' and colorbar_left:
             fig.update_layout(coloraxis_colorbar_x=-0.15)
     else:
         scene = dict(zaxis={'range': [0, sp_arr[-1]],
-                           'dtick': 50,
+                           'dtick': 100,
                            "gridcolor": "rgb(159, 197, 232)",
                            "zerolinecolor": "rgb(74, 134, 232)"},
                     xaxis={'range': [0, sp_arr[-1]],
-                           'dtick': 50,
+                           'dtick': 100,
                            "gridcolor": "rgb(159, 197, 232)",
                            "zerolinecolor": "rgb(74, 134, 232)"},)
         fig = go.Figure(data=data)
@@ -549,7 +549,7 @@ def plot_diff_modal(w, diff, sp_arr, mode='abs',n_plot=None,saturate=None, color
                           xaxis_title='Speed (rad/s)',
                           yaxis_title='Natural frequencies (rad/s)',
                           font=dict(family="Calibri, bold",
-                                    size=15),
+                                    size=18),
                           legend=dict(xanchor='center', x=0.5, yanchor='bottom',
                                       y=1, orientation='h'))
         
@@ -600,17 +600,17 @@ def plot_camp_heatmap(r, w, sp_arr, w_res=None, colorbar_title='Response (log)',
                                       'size': 15},
                              'text': f'Campbell and Response heatmap'},
                       yaxis={'range': [w_min, w_max],
-                             'dtick': 50,
+                             'dtick': 100,
                              "gridcolor": "rgb(159, 197, 232)",
                              "zerolinecolor": "rgb(74, 134, 232)"},
                       xaxis={'range': [w_min, sp_arr[-1]],
-                             'dtick': 50,
+                             'dtick': 100,
                              "gridcolor": "rgb(159, 197, 232)",
                              "zerolinecolor": "rgb(74, 134, 232)"},
                       xaxis_title='Speed (rad/s)',
                       yaxis_title='Natural frequencies (rad/s)',
                       font=dict(family="Calibri, bold",
-                                size=15),
+                                size=18),
                       legend=dict(xanchor='center', x=0.5, yanchor='bottom',
                                   y=1.02, orientation='h'))
     return fig
@@ -645,17 +645,17 @@ def plot_campbell(w, sp_arr, f_min=None):
                                       'size': 15},
                              'text': f'Campbell Diagram'},
                       yaxis={'range': [w_min, w_max],
-                             'dtick': 50,
+                             'dtick': 100,
                              "gridcolor": "rgb(159, 197, 232)",
                              "zerolinecolor": "rgb(74, 134, 232)"},
                       xaxis={'range': [w_min, sp_arr[-1]],
-                             'dtick': 50,
+                             'dtick': 100,
                              "gridcolor": "rgb(159, 197, 232)",
                              "zerolinecolor": "rgb(74, 134, 232)"},
                       xaxis_title='Speed (rad/s)',
                       yaxis_title='Natural frequencies (rad/s)',
                       font=dict(family="Calibri, bold",
-                                size=15),
+                                size=18),
                       legend=dict(xanchor='center', x=0.5, yanchor='bottom',
                                   y=1.02, orientation='h'))
     return fig
@@ -670,9 +670,9 @@ def plot_frf(r, sp_arr):
     max_y = max_y + 0.1*np.abs(max_y)
     min_y = np.log10(min([np.min(rsolo),np.min(r_det),np.min(r_var)]))
     min_y = min_y - 0.1*np.abs(min_y)
-    fig = go.Figure(data=[go.Scatter(x=sp_arr,y=np.log10(rsolo[:,0]),name='Solo rotor'),
-                          go.Scatter(x=sp_arr,y=np.log10(r_det[:,0]),name='Ressonators'),
-                          go.Scatter(x=sp_arr,y=np.log10(r_var[:,0]),name='Rainbow Ressonators'),
+    fig = go.Figure(data=[go.Scatter(x=sp_arr,y=np.log10(rsolo[:,0]),name='Bare rotor'),
+                          go.Scatter(x=sp_arr,y=np.log10(r_det[:,0]),name='Resonators'),
+                          go.Scatter(x=sp_arr,y=np.log10(r_var[:,0]),name='Rainbow Resonators'),
                           go.Scatter(x=[377,377],y=[min_y+10,max_y-10],
                                     mode='lines',line={'color':'black','dash':'dash','width':1},name='Target frequency'),
                           # go.Scatter(x=[f_1,f_1],y=[min_y,max_y],
@@ -686,13 +686,16 @@ def plot_frf(r, sp_arr):
                              },
                       yaxis={'range':[min_y,max_y],
                              "gridcolor": "rgb(159, 197, 232)",
-                             "zerolinecolor": "rgb(74, 134, 232)"},
+                             "zerolinecolor": "rgb(74, 134, 232)",
+                             "tickmode":"array",
+                             "tickvals":np.log10(np.array([1e-9,1e-8,1e-7,1e-6,1e-5,1e-4,1e-3])),
+                             "ticktext":['0.001','0.01','0.1','1','10','100','1000']},
                       xaxis={'range':[0,sp_arr[-1]],
                              'dtick':100,
                              "gridcolor": "rgb(159, 197, 232)",
                              "zerolinecolor": "rgb(74, 134, 232)"},
-                      xaxis_title='Frequency (rad/s)',                  
-                      yaxis_title='$log_{10}(M_{ax})$',
+                      xaxis_title='Frequency (rad/s)',
+                      yaxis_title=r'$M_{ax} \text{  } (\mu \text{m})$',
                       font=dict(family="Calibri, bold",
                             size=18))
     return fig
@@ -812,6 +815,69 @@ def plot_deflected_shape(rotor,y,n_pos,dof,plot_orbits=None,ys=None,isometric=Fa
                                         'title':f'Y [{un}]'},
                                  xaxis={'title':'Axial position [m]'},))
     
+    return fig
+
+
+def plot_maj_ax(rotor, y, n_pos, dof, ys=None):
+    # if type(y) != list:
+    #     y = [y]
+
+    if dof == 'trans':
+        dof = 0
+        un = 'm'
+    elif dof == 'flex':
+        dof = 2
+        un = 'rad'
+
+    N2 = len(n_pos)
+    N1 = rotor.ndof // 4 - N2
+    N = N1 + N2
+
+    l = rotor.nodes_pos
+
+    maj_ax = np.zeros(N)
+    for i in range(dof, rotor.ndof, 4):
+        fow = y[i] / 2 + 1.j / 2 * y[i + 1]
+        back = np.conj(y[i]) / 2 + 1.j / 2 * np.conj(y[i + 1])
+
+        maj_ax[i // 4] = np.abs(fow) + np.abs(back)
+
+    data_res = [go.Scatter(x=[rotor.nodes_pos[i] for i in n_pos],
+                           y=maj_ax[N1:],
+                           mode='markers', marker={'size': 4, 'color': 'red'},
+                           legendgroup='res', name='Resonators')]
+
+    for i in range(N2):
+        data_res.append(go.Scatter(x=np.ones(2) * rotor.nodes_pos[n_pos[i]],
+                                   y=np.linspace(maj_ax[n_pos[i]], maj_ax[N1 + i], 2).reshape((2)),
+                                   mode='lines', line={'color': 'red', 'width': 1},
+                                   legendgroup='res', showlegend=False))
+
+    data_solo = []
+    maj_ax2 = np.zeros(N1)
+    if type(ys) != type(None):
+
+        for i in range(dof, 4 * N1, 4):
+            fow = ys[i] / 2 + 1.j / 2 * ys[i + 1]
+            back = np.conj(ys[i]) / 2 + 1.j / 2 * np.conj(ys[i + 1])
+
+            maj_ax2[i // 4] = np.abs(fow) + np.abs(back)
+        data_solo.append(go.Scatter(x=l, y=maj_ax2,
+                                    mode='lines', line={'width': 1, 'dash': 'dash'},
+                                    name='Rotor solo'))
+
+    fig = go.Figure(data=[go.Scatter(x=l, y=maj_ax[:N1],
+                                     mode='lines', line={'width': 2}, name='Major axis'),
+                          ] + data_res + data_solo)
+
+    max_x = max((np.max(maj_ax), np.max(maj_ax2)))
+
+    fig.update_layout(yaxis={'range': [0, 1.5 * max_x],
+                             'title': f'Amplitude [{un}]'},
+                      xaxis={'title': 'Axial position [m]'},
+                      font=dict(family="Calibri, bold", size=18)
+                      )
+
     return fig
 
 def scat_iso_2d(x,y,z,mode,name=None,showlegend=True,legendgroup=None,line=None,marker=None):
