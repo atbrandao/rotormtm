@@ -70,6 +70,11 @@ class Sys_NL:
         self.ndof = len(self.K)
         self.K_lin = self.K - self.Snl * 2 * self.beta
 
+        self.dof_nl = []
+        for i in range(len(self.Snl)):
+            if self.K[i, i] == 0 and self.Snl[i, i] != 0:
+                self.dof_nl.append(i)
+
         Z = np.zeros((self.ndof, self.ndof))
         I = np.eye(self.ndof)
 
@@ -109,9 +114,8 @@ class Sys_NL:
     def t(self,omg):
 
         w0 = omg / self.nu
-        wmax = self.n_harm * w0
         t = np.linspace(0, 2 * np.pi / w0, self.N * self.n_harm)
-        t = t.reshape((len(t), 1)).reshape((len(t), 1))
+        t = t.reshape((len(t), 1))
 
         return t
 
@@ -143,7 +147,7 @@ class Sys_NL:
             [np.hstack([id_N * self.Snl[i, j] for j in range(len(self.Snl))]) for i in range(len(self.Snl))])
 
         # Pela definição: df_dx = - d(f_nl)_dx
-        df_dx = - (self.beta * Snl2 + 3 * self.alpha * (Snl2 @ x)**2 * np.eye(len(x)))
+        df_dx = - (self.beta * Snl2 + 3 * self.alpha * ((Snl2 @ x)**2 * np.eye(len(x))) @ Snl2)
 
         return df_dx
 
@@ -180,7 +184,7 @@ class Sys_NL:
 
         return dh_dz
 
-    def z0(self,omg,f_omg,dof_nl=[]):
+    def z0(self,omg,f_omg):
 
         H = self.H(omg)
 
@@ -190,7 +194,7 @@ class Sys_NL:
         x = H @ self.Minv @ F
 
         z0 = np.zeros((self.ndof*(2*self.n_harm+1),1))
-        z0[dof_nl] = self.x_eq
+        z0[self.dof_nl] = self.x_eq
         for i, y in enumerate(x[:self.ndof]):
             z0[self.ndof + 2 * (self.nu - 1) * self.ndof + i] = np.imag(y)
             z0[2 * self.ndof + 2 * (self.nu - 1) * self.ndof + i] = np.real(y)
@@ -200,11 +204,7 @@ class Sys_NL:
     def solve_hb(self, f, omg, z0=None, full_output=False, method=None):
 
         if z0 is None:
-            dof_nl = []
-            for i in range(len(self.Snl)):
-                if self.K[i,i] == 0 and self.Snl[i,i] != 0:
-                    dof_nl.append(i)
-            z0 = self.z0(omg=omg, f_omg=f, dof_nl=dof_nl)
+            z0 = self.z0(omg=omg, f_omg=f)
         if method is None:
             res = fsolve(func=self.h, x0=z0, fprime=self.dh_dz, args=(omg, f), full_output=full_output)
         else:
