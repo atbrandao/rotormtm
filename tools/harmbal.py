@@ -105,8 +105,8 @@ class Sys_NL:
         Z2 = np.vstack([Z,Z])
 
         A_out = np.vstack([np.hstack([self.K]+[Z]*(2*self.n_harm))] + \
-                          [np.hstack([Z2]*(1+2*i)+[np.vstack([np.hstack([self.K-(i+1)*(omg/self.nu)**2*self.M, -(i+1)*omg/self.nu*self.C]),
-                                                               np.hstack([(i+1)*omg/self.nu*self.C, self.K-(i+1)*(omg/self.nu)**2*self.M])])]+ \
+                          [np.hstack([Z2]*(1+2*i)+[np.vstack([np.hstack([self.K-((i+1)*(omg/self.nu))**2*self.M, -(i+1)*omg/self.nu*self.C]),
+                                                               np.hstack([(i+1)*omg/self.nu*self.C, self.K-((i+1)*(omg/self.nu))**2*self.M])])]+ \
                                      [Z2]*(2*self.n_harm-2*(i+1))) for i in range(self.n_harm)])
 
         return A_out
