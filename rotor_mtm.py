@@ -4,6 +4,7 @@ import numpy as np
 from scipy import linalg as la
 import sys
 import plotly.graph_objects as go
+from tools import harmbal
 
 
 class RotorMTM:
@@ -50,7 +51,10 @@ class RotorMTM:
 
         M_add = np.zeros((N, N))
         for i in range(0, N, 4):
-            f = 1 + (self.var / 2) * (2 * (i // 4) / (self.n_res - 1) - 1) ** self.exp_var
+            if self.n_res > 1:
+                f = 1 + (self.var / 2) * (2 * (i // 4) / (self.n_res - 1) - 1) ** self.exp_var
+            else:
+                f = 1
             M_add[i:i + 4, i:i + 4] = self.dk_r[i//4].M() * f
 
         dof = range(self.N2, N + self.N2)
@@ -76,14 +80,13 @@ class RotorMTM:
 
         return G
 
-    def K(self,sp):#K, C, n_pos, k0, k1, var=0, p_damp=0):
+    def K(self, sp, connectivity_matrix=False):#K, C, n_pos, k0, k1, var=0, p_damp=0):
 
         N = 4 * self.n_res
 
         K = self._rotor.K(sp)
 
         K_add = np.zeros((2 * N, 2 * N))
-        C_add = np.zeros((2 * N, 2 * N))
         
         dof = []
         for i, n in enumerate(self.n_pos):
@@ -102,6 +105,10 @@ class RotorMTM:
 
         dof = dof + [a for a in range(self.N2, N + self.N2)]
         # print(dof)
+
+        if connectivity_matrix: # Connectivity matrix normalized by k0 stiffness
+            K = np.zeros(K.shape)
+            K_add = K_add/self.k0
 
         K[np.ix_(dof, dof)] += K_add
 
@@ -424,6 +431,21 @@ class RotorMTM:
                                 r_diff_b=r_diff_b))
 
         return out
+
+    def create_Sys_NL(self, x_eq, sp, n_harm=10, nu=1, N=1, cp=1e-4):
+
+        M = self.M()
+        K_lin = self._rotor.K(sp)
+        C = self.C(sp) + self.G() * sp
+        Snl = self.K(sp,connectivity_matrix=True)
+        beta = -self.k0/2
+        alpha = -beta / x_eq**2
+
+        Sys = harmbal.Sys_NL(M=M, K=K_lin, Snl=Snl, beta=beta, alpha=alpha,
+                             n_harm=n_harm, nu=nu, N=N, cp=cp, C=C)
+
+        return Sys
+
 
 
 def plot_diff_modal(w, diff, sp_arr, mode='abs',n_plot=None,saturate=None, colorbar_left=False):
