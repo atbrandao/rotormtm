@@ -71,7 +71,10 @@ class RotorMTM:
 
         G_add = np.zeros((N, N))
         for i in range(0, N, 4):
-            f = 1 + (self.var / 2) * (2 * (i // 4) / (self.n_res - 1) - 1) ** self.exp_var
+            if self.n_res > 1:
+                f = 1 + (self.var / 2) * (2 * (i // 4) / (self.n_res - 1) - 1) ** self.exp_var
+            else:
+                f = 1
             G_add[i:i + 4, i:i + 4] = self.dk_r[i//4].G() * f
 
         dof = range(self.N2, N + self.N2)
@@ -80,7 +83,7 @@ class RotorMTM:
 
         return G
 
-    def K(self, sp, connectivity_matrix=False):#K, C, n_pos, k0, k1, var=0, p_damp=0):
+    def K(self, sp, connectivity_matrix=None):#K, C, n_pos, k0, k1, var=0, p_damp=0):
 
         N = 4 * self.n_res
 
@@ -91,7 +94,10 @@ class RotorMTM:
         dof = []
         for i, n in enumerate(self.n_pos):
             dof += [a for a in range(4 * n, 4 * n + 4)]
-            f = (1 - self.var_k / 2) + i / (self.n_res - 1) * self.var_k
+            if self.n_res > 1:
+                f = (1 - self.var_k / 2) + i / (self.n_res - 1) * self.var_k
+            else:
+                f = 1
             K_aux = np.array([[self.k0 * f, 0, 0, 0, -self.k0 * f, 0, 0, 0],
                               [0, self.k0 * f, 0, 0, 0, -self.k0 * f, 0, 0],
                               [0, 0, self.k1 * f, 0, 0, 0, -self.k1 * f, 0],
@@ -106,9 +112,16 @@ class RotorMTM:
         dof = dof + [a for a in range(self.N2, N + self.N2)]
         # print(dof)
 
-        if connectivity_matrix: # Connectivity matrix normalized by k0 stiffness
+        if connectivity_matrix is not None:
             K = np.zeros(K.shape)
-            K_add = K_add/self.k0
+            if connectivity_matrix == 0:
+                K_add[2::4] = 0
+                K_add[3::4] = 0
+                K_add = K_add / self.k0
+            elif connectivity_matrix == 1:
+                K_add[0::4] = 0
+                K_add[1::4] = 0
+                K_add = K_add / self.k1
 
         K[np.ix_(dof, dof)] += K_add
 
@@ -124,7 +137,10 @@ class RotorMTM:
         dof = []
         for i, n in enumerate(self.n_pos):
             dof += [a for a in range(4 * n, 4 * n + 4)]
-            f = (1 - self.var_k / 2) + i / (self.n_res - 1) * self.var_k
+            if self.n_res > 1:
+                f = (1 - self.var_k / 2) + i / (self.n_res - 1) * self.var_k
+            else:
+                f = 1
             K_aux = np.array([[self.k0 * f, 0, 0, 0, -self.k0 * f, 0, 0, 0],
                               [0, self.k0 * f, 0, 0, 0, -self.k0 * f, 0, 0],
                               [0, 0, self.k1 * f, 0, 0, 0, -self.k1 * f, 0],
@@ -432,16 +448,29 @@ class RotorMTM:
 
         return out
 
-    def create_Sys_NL(self, x_eq, sp, n_harm=10, nu=1, N=1, cp=1e-4):
+    def create_Sys_NL(self, x_eq0=None, x_eq1=None, sp=0, n_harm=10, nu=1, N=1, cp=1e-4):
 
         M = self.M()
+        beta0 = -self.k0 / 2
+        beta1 = -self.k1 / 2
         K_lin = self._rotor.K(sp)
+        K_lin = K_lin + beta0 * self.K(sp, connectivity_matrix=0) + beta1 * self.K(sp, connectivity_matrix=1)
         C = self.C(sp) + self.G() * sp
-        Snl = self.K(sp,connectivity_matrix=True)
-        beta = -self.k0/2
-        alpha = -beta / x_eq**2
 
-        Sys = harmbal.Sys_NL(M=M, K=K_lin, Snl=Snl, beta=beta, alpha=alpha,
+        Snl = 0 * M #self.K(sp, connectivity_matrix=dof)
+        if x_eq0 is not None:
+            alpha = -beta0 / x_eq0 ** 2
+            Snl += self.K(sp, connectivity_matrix=0)
+        else:
+            alpha = 0
+
+        if x_eq1 is not None:
+            alpha1 = -beta1 / x_eq1 ** 2
+            if x_eq0 is None:
+                alpha = alpha1
+            Snl += self.K(sp, connectivity_matrix=1) * (alpha1/alpha) ** (1/3)
+
+        Sys = harmbal.Sys_NL(M=M, K=K_lin, Snl=Snl, beta=0, alpha=alpha,
                              n_harm=n_harm, nu=nu, N=N, cp=cp, C=C)
 
         return Sys

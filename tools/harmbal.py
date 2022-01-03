@@ -54,11 +54,14 @@ def poincare_section(x, t, omg, n_points=10):
 
 class Sys_NL:
 
-    def __init__(self,M,K,Snl,beta,alpha,n_harm=10,nu=1,N=2,cp=1e-4):
+    def __init__(self,M,K,Snl,beta,alpha,n_harm=10,nu=1,N=2,cp=1e-4,C=None):
 
         self.M = M
         self.cp = cp
-        self.C = K * cp
+        if C is None:
+            self.C = K * cp
+        else:
+            self.C = C
         self.K = K
         self.Snl = Snl
         self.beta = beta
@@ -188,7 +191,7 @@ class Sys_NL:
 
         H = self.H(omg)
 
-        F = np.zeros((2*self.ndof,1))
+        F = np.zeros((2*self.ndof,1)).astype(complex)
         for f in f_omg:
             F[self.ndof+f] = f_omg[f]
         x = H @ self.Minv @ F
