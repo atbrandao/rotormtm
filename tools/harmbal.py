@@ -136,21 +136,27 @@ class Sys_NL:
     def f_nl(self,x):
 
         id_N = np.eye(self.N*self.n_harm)
-        Snl2 = np.vstack(
-            [np.hstack([id_N*self.Snl[i,j] for j in range(len(self.Snl))]) for i in range(len(self.Snl))])
+        try:
+            self.Snl2
+        except:
+            self.Snl2 = np.vstack(
+                [np.hstack([id_N*self.Snl[i,j] for j in range(len(self.Snl))]) for i in range(len(self.Snl))])
 
-        f_nl = self.beta * Snl2 @ x + self.alpha * (Snl2 @ x)**3
+        f_nl = self.beta * self.Snl2 @ x + self.alpha * (self.Snl2 @ x)**3
 
         return f_nl
 
     def df_dx(self,x):
 
         id_N = np.eye(self.N * self.n_harm)
-        Snl2 = np.vstack(
-            [np.hstack([id_N * self.Snl[i, j] for j in range(len(self.Snl))]) for i in range(len(self.Snl))])
+        try:
+            self.Snl2
+        except:
+            self.Snl2 = np.vstack(
+                [np.hstack([id_N * self.Snl[i, j] for j in range(len(self.Snl))]) for i in range(len(self.Snl))])
 
         # Pela definição: df_dx = - d(f_nl)_dx
-        df_dx = - (self.beta * Snl2 + 3 * self.alpha * ((Snl2 @ x)**2 * np.eye(len(x))) @ Snl2)
+        df_dx = - (self.beta * self.Snl2 + 3 * self.alpha * ((self.Snl2 @ x)**2 * np.eye(len(x))) @ self.Snl2)
 
         return df_dx
 
@@ -164,14 +170,20 @@ class Sys_NL:
         else:
             f_omg = args[1]
 
+        if len(args) > 3:
+            g = args[2]
+            gi = args[3]
+        else:
+            g = self.gamma(omg)
+            gi = la.pinv(g)
+
         b_f = np.zeros((self.ndof*(2*self.n_harm+1),1))
         for f in f_omg:
             b_f[self.ndof + 2 * (self.nu - 1) * self.ndof + f] = np.imag(f_omg[f])
             b_f[2 * self.ndof + 2 * (self.nu - 1) * self.ndof + f] = np.real(f_omg[f])
         # print(b_f)
-        g = self.gamma(omg)
         x = g @ z
-        b = b_f - la.pinv(g) @ self.f_nl(x)
+        b = b_f - gi @ self.f_nl(x)
         h = self.A_hb(omg) @ z - b
 
         return h.reshape(len(h))
@@ -180,9 +192,15 @@ class Sys_NL:
 
         omg = args[0]
 
-        g = self.gamma(omg)
+        if len(args) > 3:
+            g = args[2]
+            gi = args[3]
+        else:
+            g = self.gamma(omg)
+            gi = la.pinv(g)
+
         x = g @ z
-        db_dz = la.pinv(g) @ self.df_dx(x) @ g
+        db_dz = gi @ self.df_dx(x) @ g
         dh_dz = self.A_hb(omg) - db_dz
 
         return dh_dz
@@ -206,12 +224,15 @@ class Sys_NL:
 
     def solve_hb(self, f, omg, z0=None, full_output=False, method=None):
 
+        g = self.gamma(omg)
+        gi = la.pinv(self.gamma(omg))
+
         if z0 is None:
             z0 = self.z0(omg=omg, f_omg=f)
         if method is None:
-            res = fsolve(func=self.h, x0=z0, fprime=self.dh_dz, args=(omg, f), full_output=full_output)
+            res = fsolve(func=self.h, x0=z0, fprime=self.dh_dz, args=(omg, f, g, gi), full_output=full_output)
         else:
-            res = least_squares(fun=self.h, x0=z0, jac=self.dh_dz, args=(omg, f), xtol=1e-9)
+            res = least_squares(fun=self.h, x0=z0, jac=self.dh_dz, args=(omg, f, g, gi))
 
         if full_output:
             if method is None:
