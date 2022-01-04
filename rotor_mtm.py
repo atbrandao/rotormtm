@@ -461,17 +461,24 @@ class RotorMTM:
         if x_eq0 is not None:
             alpha = -beta0 / x_eq0 ** 2
             Snl += self.K(sp, connectivity_matrix=0)
+            x_eq = x_eq0
         else:
             alpha = 0
+            x_eq = 0
 
         if x_eq1 is not None:
             alpha1 = -beta1 / x_eq1 ** 2
             if x_eq0 is None:
+                x_eq = x_eq1
                 alpha = alpha1
             Snl += self.K(sp, connectivity_matrix=1) * (alpha1/alpha) ** (1/3)
 
         Sys = harmbal.Sys_NL(M=M, K=K_lin, Snl=Snl, beta=0, alpha=alpha,
                              n_harm=n_harm, nu=nu, N=N, cp=cp, C=C)
+
+        Sys.dof_nl = [i for i in range(self.N2, len(Snl)) if Snl[i, i] != 0]
+        Sys.x_eq = x_eq
+
 
         return Sys
 
