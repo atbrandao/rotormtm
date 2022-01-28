@@ -454,15 +454,20 @@ class RotorMTM:
         beta0 = -self.k0 / 2
         beta1 = -self.k1 / 2
         K_lin = self._rotor.K(sp)
-        K_lin = K_lin + beta0 * self.K(sp, connectivity_matrix=0) + beta1 * self.K(sp, connectivity_matrix=1)
+        aux = self.p_damp
+        self.p_damp = cp
         C = self.C(sp) + self.G() * sp
+        self.p_damp = aux
 
         Snl = 0 * M #self.K(sp, connectivity_matrix=dof)
         if x_eq0 is not None:
             alpha = -beta0 / x_eq0 ** 2
             Snl += self.K(sp, connectivity_matrix=0)
+            K_lin += beta0 * self.K(sp, connectivity_matrix=0)
+            beta = beta0
             x_eq = x_eq0
         else:
+            K_lin += self.k0 * self.K(sp, connectivity_matrix=0)
             alpha = 0
             x_eq = 0
 
@@ -471,14 +476,17 @@ class RotorMTM:
             if x_eq0 is None:
                 x_eq = x_eq1
                 alpha = alpha1
-            Snl += self.K(sp, connectivity_matrix=1) * (alpha1/alpha) ** (1/3)
+            Snl += self.K(sp, connectivity_matrix=1)# * (alpha1/alpha) ** (1/3)
+            K_lin += beta1 * self.K(sp, connectivity_matrix=1)
+            beta = beta1
+        else:
+            K_lin += self.k1 * self.K(sp, connectivity_matrix=1)
 
         Sys = harmbal.Sys_NL(M=M, K=K_lin, Snl=Snl, beta=0, alpha=alpha,
-                             n_harm=n_harm, nu=nu, N=N, cp=cp, C=C)
+                             n_harm=n_harm, nu=nu, N=N, C=C)
 
         Sys.dof_nl = [i for i in range(self.N2, len(Snl)) if Snl[i, i] != 0]
         Sys.x_eq = x_eq
-
 
         return Sys
 
