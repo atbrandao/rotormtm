@@ -2,6 +2,7 @@ import numpy as np
 import scipy.linalg as la
 from scipy.optimize import newton, least_squares, fsolve
 import plotly.graph_objects as go
+import time
 #
 # m0 = 1
 # m1 = 0.5
@@ -69,7 +70,10 @@ class Sys_NL:
         self.n_harm = n_harm
         self.nu = nu
         self.N = N
-        self.x_eq = np.sqrt(-self.beta/self.alpha)
+        if self.alpha != 0:
+            self.x_eq = np.sqrt(-self.beta/self.alpha)
+        else:
+            self.x_eq = 0
         self.ndof = len(self.K)
         self.K_lin = self.K - self.Snl * 2 * self.beta
 
@@ -117,7 +121,7 @@ class Sys_NL:
     def t(self,omg):
 
         w0 = omg / self.nu
-        t = np.linspace(0, 2 * np.pi / w0, self.N * self.n_harm)
+        t = np.linspace(0, 2 * np.pi / w0, 2 * self.N * self.n_harm)
         t = t.reshape((len(t), 1))
 
         return t
@@ -133,9 +137,20 @@ class Sys_NL:
 
         return gamma
 
+    def dgamma_dt(self, omg):
+
+        id_n = np.eye(self.ndof)
+        w0 = omg/self.nu
+        wt = w0 * self.t(omg)
+        # print(wt)
+        dgamma_dt = np.hstack([np.kron(id_n,0*np.cos(0*wt))] + [np.hstack([np.kron(id_n,(i+1)*w0*np.cos((i+1)*wt)),
+                                                                     np.kron(id_n,-(i+1)*w0*np.sin((i+1)*wt))]) for i in range(self.n_harm)])
+
+        return dgamma_dt
+
     def f_nl(self,x):
 
-        id_N = np.eye(self.N*self.n_harm)
+        id_N = np.eye(2*self.N*self.n_harm)
         try:
             self.Snl2
         except:
@@ -148,7 +163,7 @@ class Sys_NL:
 
     def df_dx(self,x):
 
-        id_N = np.eye(self.N * self.n_harm)
+        id_N = np.eye(2 * self.N * self.n_harm)
         try:
             self.Snl2
         except:
@@ -222,13 +237,14 @@ class Sys_NL:
 
         return z0.reshape(len(z0))
 
-    def solve_hb(self, f, omg, z0=None, full_output=False, method=None):
+    def solve_hb(self, f, omg, z0=None, full_output=False, method=None, state_space=False):
 
         g = self.gamma(omg)
         gi = la.pinv(self.gamma(omg))
 
         if z0 is None:
             z0 = self.z0(omg=omg, f_omg=f)
+
         if method is None:
             res = fsolve(func=self.h, x0=z0, fprime=self.dh_dz, args=(omg, f, g, gi), full_output=full_output)
         else:
@@ -247,6 +263,12 @@ class Sys_NL:
         x = self.gamma(omg) @ root.reshape((len(root), 1))
         x = x.reshape(len(x))
         x = x.reshape((self.ndof,len(x)//self.ndof))[:,:-1]
+        if state_space:
+            v = self.dgamma_dt(omg) @ root.reshape((len(root), 1))
+            v = v.reshape(len(v))
+            v = v.reshape((self.ndof, len(v) // self.ndof))[:, :-1]
+            x = np.vstack([x,
+                           v])
         if full_output:
             return x, res
         else:
@@ -281,25 +303,191 @@ class Sys_NL:
 
         return np.reshape(x + dt / 6 * (k1 + 2 * k2 + 2 * k3 + k4), (len(x), 1))
 
-    def solve_transient(self, f, t, omg, x0):
+    def solve_transient(self, f, t, omg, x0, probe_dof=None, last_x=False, plot_orbit=False, dt=None):
 
-        x = np.zeros((2*self.ndof,len(t)))
-        x[:,0] = x0[:,0]
+        if probe_dof is None:
+            probe_dof = [i for i in range(len(x0))]
 
-        for i in range(1,len(t)):
-            dt = t[i] - t[i-1]
+        x = np.zeros((2*self.ndof, 2))
+        x[:, 0] = x0[:, 0]
+        F_aux = np.zeros((2*self.ndof, 3))
+
+        x_out = np.zeros((len(probe_dof), len(t)))
+        x_out[:,0] = x0[probe_dof,0]
+
+
+        for i in range(1, len(t)):
+            if dt is None:
+                dt = t[i] - t[i-1]
 
             F = np.zeros((self.ndof, 3))
             for n in f:
                 F[n, 0] = np.real(f[n]) * np.cos(omg * t[i-1]) + np.imag(f[n]) * np.sin(omg * t[i-1])
                 F[n, 1] = np.real(f[n]) * np.cos(omg * t[i-1]+dt/2) + np.imag(f[n]) * np.sin(omg * t[i-1]+dt/2)
                 F[n, 2] = np.real(f[n]) * np.cos(omg * t[i-1]+dt) + np.imag(f[n]) * np.sin(omg * t[i-1]+dt)
-
-            B_aux = self.Minv @ np.vstack([0*F, F])
+            F_aux[len(F):, :] = F
+            B_aux = self.Minv @ F_aux
             # print(B_aux)
-            x[:,i] = self.RK4_NL(B_aux,x[:,i-1],dt)[:,0]
+            x[:,1] = self.RK4_NL(B_aux,x[:,0],dt)[:,0]
+            # print(np.round(100 * i / len(t)))
+            if np.round(10*i/len(t)) > np.round(10*(i-1)/len(t)):
+                print(np.round(100*i/len(t)))
+            x_out[:,i] = x[probe_dof,1]
+            x[:,0] = x[:,1]
 
-        return x
+        if plot_orbit:
+            Ni = int(np.round(2*np.pi/omg / dt))
+            fig = self.plot_orbit(x_out[:,x_out.shape[1]//2:],Ni)
+            return fig, x_out
+        elif last_x:
+            return x_out, x[:,1]
+        else:
+            return x_out
+
+    def plot_frf(self, omg_range, f, tf=300, dt_base=0.01, rms_rk=None, continuation=True, method=None, probe_dof=None):
+
+        rms_hb = np.zeros((1+self.ndof, len(omg_range)))
+        pc = []
+        cost_hb = []
+
+        if probe_dof is None:
+            probe_dof = [i for i in range(self.ndof)]
+
+        if rms_rk is None:
+            calc = True
+            rms_rk = np.zeros((len(probe_dof), len(omg_range)))
+        else:
+            calc = False
+
+        n_points = 50
+        z0 = self.z0(omg=omg_range[0], f_omg={0: 0})  # None
+        x0 = np.vstack([z0[:self.ndof].reshape((self.ndof, 1)),
+                        0 * z0[:self.ndof].reshape((self.ndof, 1))])
+
+
+        for i, omg in enumerate(omg_range):
+            t0 = time.time()
+            tf = np.round(tf / (2 * np.pi / omg)) * 2 * np.pi / omg
+            dt = 2 * np.pi / omg / (np.round(2 * np.pi / omg / dt_base))
+            t_rk = np.arange(0, tf + dt / 2, dt)
+            if not continuation:
+                x0 = np.vstack([z0[:self.ndof].reshape((self.ndof,1)),
+                                0 * z0[:self.ndof].reshape((self.ndof,1))])
+            if calc:
+                x_rk, x0 = self.solve_transient(f, t_rk, omg, x0.reshape((self.ndof*2, 1)),
+                                                probe_dof=probe_dof, last_x=True, dt=dt)
+                print(f'RK4 took {(time.time() - t0):.1f} seconds to run.')
+            t1 = time.time()
+            # if not continuation:
+            z0 = self.z0(omg=omg_range[0], f_omg={0: 0})  # None
+            try:
+                x_hb, res = self.solve_hb(f, omg, z0=z0, full_output=True, method=method)  # 'ls')
+            except:
+                x_hb, res = self.solve_hb(f, omg, z0=z0, full_output=True, method='ls')  # 'ls')
+
+            try:
+                cost_hb.append(res.cost)
+                z0 = res.x
+            except:
+                cost_hb.append(np.linalg.norm(res[1]['fvec']))
+                z0 = res[0]
+            print(
+                f'Harmbal took {(time.time() - t1):.1f} seconds to run: {(t1 - t0) / (time.time() - t1):.1f} times faster.')
+
+            if calc:
+                rms_rk[:, i] = np.array(
+                    [np.sqrt(
+                    np.sum((x_rk[i, int((tf / 2) / dt):] - np.mean(x_rk[i, int((tf / 2) / dt):])) ** 2) / (
+                        int((tf / 2) / dt))) for i in range(x_rk.shape[0])])
+                pc.append(poincare_section(x_rk, t_rk, omg, n_points))
+
+            rms_hb[:-1, i] = np.array(
+                [np.sqrt(np.sum((x_hb[i, :] - np.mean(x_hb[i, :])) ** 2) / (len(self.t(omg)) - 1)) for i in
+                 range(x_hb.shape[0])])
+
+            try:
+                if res[-2] != 1:
+                    print(res[-1])
+                    rms_hb[-1, i] = 1
+            except:
+                if not res.success:
+                    print(res.message)
+                    rms_hb[-1, i] = 1
+
+            print(f'Frequency: {omg:.1f} rad/s -> completed.')
+            print('---------')
+
+        fig = go.Figure(data=[go.Scatter(x=omg_range, y=rms_hb[i, :], name=f'DoF {i}- HB') for i in probe_dof] + \
+                             [go.Scatter(x=[omg_range[i] for i in range(len(omg_range)) if rms_hb[-1, i] == 1],
+                                         y=[rms_hb[j, i] for i in range(len(omg_range)) if rms_hb[-1, i] == 1],
+                                         name='Flagged', mode='markers', marker=dict(color='black'),
+                                         legendgroup='flag') for j in probe_dof] + \
+                             [go.Scatter(x=omg_range, y=rms_rk[i, :], name=f'DoF {i} - RK') for i in probe_dof])
+        fig.update_layout(title={'xanchor': 'center',
+                                 'x': 0.4,
+                                 'font': {'family': 'Arial, bold',
+                                          'size': 15},
+                                 },
+                          yaxis={"gridcolor": "rgb(159, 197, 232)",
+                                 "zerolinecolor": "rgb(74, 134, 232)",
+                                 },
+                          xaxis={'range': [0, np.max(omg_range)],
+                                 "gridcolor": "rgb(159, 197, 232)",
+                                 "zerolinecolor": "rgb(74, 134, 232)"},
+                          xaxis_title='Frequency (rad/s)',
+                          yaxis_title='Amplitude',
+                          font=dict(family="Calibri, bold",
+                                    size=18))
+        fig.update_yaxes(type="log")
+
+        fig_cost = go.Figure(data=[go.Scatter(x=omg_range, y=cost_hb, name='Cost HB'),
+                               go.Scatter(x=[omg_range[i] for i in range(len(omg_range)) if rms_hb[-1, i] == 1],
+                                          y=[cost_hb[i] for i in range(len(omg_range)) if rms_hb[-1, i] == 1],
+                                          name='Flagged', mode='markers', marker=dict(color='black'),
+                                          legendgroup='flag'),
+                               ])
+        fig_cost.update_layout(title={'xanchor': 'center',
+                                 'x': 0.4,
+                                 'font': {'family': 'Arial, bold',
+                                          'size': 15},
+                                 },
+                          yaxis={"gridcolor": "rgb(159, 197, 232)",
+                                 "zerolinecolor": "rgb(74, 134, 232)",
+                                 },
+                          xaxis={'range': [0, np.max(omg_range)],
+                                 "gridcolor": "rgb(159, 197, 232)",
+                                 "zerolinecolor": "rgb(74, 134, 232)"},
+                          xaxis_title='Frequency (rad/s)',
+                          yaxis_title='Cost function norm',
+                          font=dict(family="Calibri, bold",
+                                    size=18))
+        fig_cost.update_yaxes(type="log")
+
+        return fig, fig_cost
+
+    @classmethod
+    def plot_orbit(cls, x, Ni):
+
+        n_probes = x.shape[0] // 2
+        fig = go.Figure()
+        for i in range(n_probes):
+            fig.add_trace(go.Scatter(x=x[i,:],y=x[i+n_probes,:],
+                                     name=f'probe {i}',legendgroup=f'{i}'))
+            fig.add_trace(go.Scatter(x=x[i,::Ni],y=x[i+n_probes,::Ni],
+                                     name=f'probe {i}',legendgroup=f'{i}',
+                                     mode='markers',showlegend=False,marker=dict(color='red')))
+
+        x_range = [np.min(x[:n_probes,:] * 1.1), np.max(x[:n_probes,:] * 1.1)]
+        v_range = [np.min(x[n_probes:, :] * 1.1), np.max(x[n_probes:, :] * 1.1)]
+        fig.update_layout(xaxis=dict(title='X',
+                                     range=x_range),
+                          yaxis=dict(title='dX/dt',
+                                     range=v_range))
+
+        return fig
+
+
+
 
 
 
