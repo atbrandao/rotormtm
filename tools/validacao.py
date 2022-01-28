@@ -40,96 +40,190 @@ K = np.array([[k0 + beta , -beta],
 cp = 5e-3
 C = cp * K
 
-
 n_harm = 20
 nu = 1
-N = 2 # sinal no tempo terá comprimento N*n_harm
+N = 2 # sinal no tempo terá comprimento 2*N*n_harm
 
-S = Sys_NL(M=M,K=K_lin,Snl=Snl,beta=beta,alpha=alpha,n_harm=n_harm,nu=nu,N=N,cp=cp)
+S = Sys_NL(M=M,K=K_lin+beta*Snl,Snl=Snl,beta=0,alpha=alpha,
+           n_harm=n_harm,nu=nu,N=N,cp=cp,C=K_lin*cp)
+
+S.dof_nl = [1]
+S.x_eq = x_eq
 
 omg = 11
 
-f = {0: 1}
-try:
-    with open(f'data_rk f {f}.pic'.replace(':','_'),'rb') as file:
-        aux = load(file)
-        rms_rk = aux[0]
-        pc = aux[1]
-    calc = False
-except:
-    calc = True
+f = {0: 0.9}
+# try:
+#     with open(f'data_rk f {f}.pic'.replace(':','_'),'rb') as file:
+#         aux = load(file)
+#         rms_rk = aux[0]
+#         pc = aux[1]
+#     calc = False
+# except:
+#     calc = True
     
-tf = 500
-dt = 0.01
-t_rk = np.arange(0,tf,dt)
+calc = True
 
-omg_range = np.arange(0.5,20,.05)
-rms_hb = np.zeros((3,len(omg_range)))
-if calc:
-    rms_rk = np.zeros((2,len(omg_range)))
-    pc = []
-cost_hb = []
-n_points = 50
-z0 = None
+omg_range_up = np.arange(0.5,20,.05)
+omg_range_down = np.arange(20,0.5,-.05)
 
-for i, omg in enumerate(omg_range):
-    t0 = time.time()
-    if calc:        
-        x_rk = S.solve_transient(f,t_rk,omg,np.array([[0],[x_eq],[0],[0]]))
-        print(f'RK4 took {(time.time()-t0):.1f} seconds to run.')
-    t1 = time.time()
-    x_hb, res = S.solve_hb(f,omg,z0=z0,full_output=True,method=None)#'ls')
+for f0 in np.arange(0.01, 1, 0.05):
     
-    try:
-        cost_hb.append(res.cost)
-        z0 = res.x
-    except:
-        cost_hb.append(np.linalg.norm(res[1]['fvec']))
-        z0 = res[0]
-    print(f'Harmbal took {(time.time()-t1):.1f} seconds to run: {(t1-t0)/(time.time()-t1):.1f} times faster.')
+    f = {0: f0}
+        
+    # rms_hb = np.zeros((3,len(omg_range)))
+    # rms_rk = np.zeros((2,len(omg_range)))
+    # pc = []
+    # cost_hb = []
     
-    if calc:
-        rms_rk[0,i] = np.sqrt(np.sum((x_rk[0,int((tf/2)/dt):] - np.mean(x_rk[0,int((tf/2)/dt):])) ** 2) / (int((tf/2)/dt)))
-        rms_rk[1,i] = np.sqrt(np.sum((x_rk[1,int((tf/2)/dt):] - np.mean(x_rk[1,int((tf/2)/dt):])) ** 2) / (int((tf/2)/dt)))
-        pc.append(pcs(x_rk, t_rk, omg, n_points))
+    n_points = 50
+    # z0 = S.z0(omg=omg_range[0],f_omg={0:0}) # None
+    # x0 = np.array([[0],[x_eq],[0],[0]])
     
-    rms_hb[0,i] = np.sqrt(np.sum((x_hb[0,:] - np.mean(x_hb[0,:])) ** 2) / (len(S.t(omg))-1))
-    rms_hb[1,i] = np.sqrt(np.sum((x_hb[1,:] - np.mean(x_hb[1,:])) ** 2) / (len(S.t(omg))-1))
-    try:
-        if res[-2] != 1:
-            print(res[-1])
-            rms_hb[2,i] = 1
-    except:
-        if not res.success:
-            print(res.message)
-            rms_hb[2,i] = 1
-    # print(res.message)
-            
-    print(f'Frequency: {omg:.1f} rad/s -> completed.')
-    print('---------')
+    string_f = f'{[(k,np.around(f[k],2)) for k in f]}'
     
-if calc:
-    with open(f'data_rk f {f}.pic'.replace(':','_'),'wb') as file:
-        dump([rms_rk,pc],file)
+    fig1, fig2 = S.plot_frf(omg_range_up, f, dt_base=0.03, tf=180)
+    fig1.update_layout(title=f'Upsweep - f = {string_f}')
+    fig1.write_html(f'FRF/FRF Upsweep - f = {string_f}.html'.replace(':','_'))
+    fig1.write_image(f'FRF/FRF Upsweep - f = {string_f}.pdf'.replace(':','_'))
+    fig1.write_image(f'FRF/FRF Upsweep - f = {string_f}.png'.replace(':','_'))
+    
+    fig2.update_layout(title=f'Upsweep - f = {string_f}')
+    fig2.write_html(f'FRF/Cost Upsweep - f = {string_f}.html'.replace(':','_'))
+    fig2.write_image(f'FRF/Cost Upsweep - f = {string_f}.pdf'.replace(':','_'))
+    fig2.write_image(f'FRF/Cost Upsweep - f = {string_f}.png'.replace(':','_'))
+    
+    fig1, fig2 = S.plot_frf(omg_range_down, f, dt_base=0.03, tf=180)
+    fig1.update_layout(title=f'Downsweep - f = {string_f}')
+    fig1.write_html(f'FRF/FRF Downsweep - f = {string_f}.html'.replace(':','_'))
+    fig1.write_image(f'FRF/FRF Downsweep - f = {string_f}.pdf'.replace(':','_'))
+    fig1.write_image(f'FRF/FRF Downsweep - f = {string_f}.png'.replace(':','_'))
+    
+    fig2.update_layout(title=f'Downsweep - f = {string_f}')
+    fig2.write_html(f'FRF/Cost Downsweep - f = {string_f}.html'.replace(':','_'))
+    fig2.write_image(f'FRF/Cost Downsweep - f = {string_f}.pdf'.replace(':','_'))
+    fig2.write_image(f'FRF/Cost Downsweep - f = {string_f}.png'.replace(':','_'))
+    
+    
+# def plot_frf(omg_range, )
+    
+#     for i, omg in enumerate(omg_range):
+#         tf = np.round(300/(2*np.pi/omg)) * 2*np.pi/omg
+#         dt = 2*np.pi/omg / (np.round(2*np.pi/omg / 0.01))
+#         t_rk = np.arange(0,tf + dt/2,dt)
+#         t0 = time.time()
+#         if calc:        
+#             x_rk, x0 = S.solve_transient(f,t_rk,omg,x0.reshape((4,1)),last_x=True,dt=dt)
+#             print(f'RK4 took {(time.time()-t0):.1f} seconds to run.')
+#         t1 = time.time()
+#         z0 = S.z0(omg=omg_range[0],f_omg={0:0}) # None
+#         x_hb, res = S.solve_hb(f,omg,z0=z0,full_output=True,method=None)#'ls')
+        
+#         try:
+#             cost_hb.append(res.cost)
+#             z0 = res.x
+#         except:
+#             cost_hb.append(np.linalg.norm(res[1]['fvec']))
+#             z0 = res[0]
+#         print(f'Harmbal took {(time.time()-t1):.1f} seconds to run: {(t1-t0)/(time.time()-t1):.1f} times faster.')
+        
+#         if calc:
+#             rms_rk[0,i] = np.sqrt(np.sum((x_rk[0,int((tf/2)/dt):] - np.mean(x_rk[0,int((tf/2)/dt):])) ** 2) / (int((tf/2)/dt)))
+#             rms_rk[1,i] = np.sqrt(np.sum((x_rk[1,int((tf/2)/dt):] - np.mean(x_rk[1,int((tf/2)/dt):])) ** 2) / (int((tf/2)/dt)))
+#             pc.append(pcs(x_rk, t_rk, omg, n_points))
+        
+#         rms_hb[0,i] = np.sqrt(np.sum((x_hb[0,:] - np.mean(x_hb[0,:])) ** 2) / (len(S.t(omg))-1))
+#         rms_hb[1,i] = np.sqrt(np.sum((x_hb[1,:] - np.mean(x_hb[1,:])) ** 2) / (len(S.t(omg))-1))
+#         try:
+#             if res[-2] != 1:
+#                 print(res[-1])
+#                 rms_hb[2,i] = 1
+#         except:
+#             if not res.success:
+#                 print(res.message)
+#                 rms_hb[2,i] = 1
+#         # print(res.message)
+                
+#         print(f'Frequency: {omg:.1f} rad/s -> completed.')
+#         print('---------')
+        
+#     if calc:
+#         with open(f'data_rk f {f} _ up.pic'.replace(':','_'),'wb') as file:
+#             dump([rms_rk,pc],file)
+    
+#     fig = go.Figure(data=[go.Scatter(x=omg_range,y=rms_hb[0,:],name='DoF 1 - HB'),
+#                           go.Scatter(x=omg_range,y=rms_hb[1,:],name='DoF 2 - HB'),
+#                           go.Scatter(x=[omg_range[i] for i in range(len(omg_range)) if rms_hb[2,i]==1],
+#                                      y=[rms_hb[0,i] for i in range(len(omg_range)) if rms_hb[2,i]==1],
+#                                      name='Flagged',mode='markers',marker=dict(color='black'),legendgroup='flag'),
+#                            go.Scatter(x=[omg_range[i] for i in range(len(omg_range)) if rms_hb[2,i]==1],
+#                                       y=[rms_hb[1,i] for i in range(len(omg_range)) if rms_hb[2,i]==1],
+#                                       legendgroup='flag',showlegend=False,mode='markers',marker=dict(color='black')),
+#                           go.Scatter(x=omg_range,y=rms_rk[0,:],name='DoF 1 - RK'),
+#                           go.Scatter(x=omg_range,y=rms_rk[1,:],name='DoF 2 - RK')])
+#     fig.update_yaxes(type="log")
+#     # fig.write_html(f'FRF RK vs HB - f {f}.html'.replace(':','_'))
+    
+#     fig2 = go.Figure(data=[go.Scatter(x=omg_range,y=cost_hb,name='DoF 1 - HB'),
+#                           go.Scatter(x=[omg_range[i] for i in range(len(omg_range)) if rms_hb[2,i]==1],
+#                                      y=[cost_hb[i] for i in range(len(omg_range)) if rms_hb[2,i]==1],
+#                                      name='Flagged',mode='markers',marker=dict(color='black'),legendgroup='flag'),
+#                            ])
+#     fig2.update_yaxes(type="log")
 
-fig = go.Figure(data=[go.Scatter(x=omg_range,y=rms_hb[0,:],name='DoF 1 - HB'),
-                      go.Scatter(x=omg_range,y=rms_hb[1,:],name='DoF 2 - HB'),
-                      go.Scatter(x=[omg_range[i] for i in range(len(omg_range)) if rms_hb[2,i]==1],
-                                 y=[rms_hb[0,i] for i in range(len(omg_range)) if rms_hb[2,i]==1],
-                                 name='Flagged',mode='markers',marker=dict(color='black'),legendgroup='flag'),
-                       go.Scatter(x=[omg_range[i] for i in range(len(omg_range)) if rms_hb[2,i]==1],
-                                  y=[rms_hb[1,i] for i in range(len(omg_range)) if rms_hb[2,i]==1],
-                                  legendgroup='flag',showlegend=False,mode='markers',marker=dict(color='black')),
-                      go.Scatter(x=omg_range,y=rms_rk[0,:],name='DoF 1 - RK'),
-                      go.Scatter(x=omg_range,y=rms_rk[1,:],name='DoF 2 - RK')])
-fig.update_yaxes(type="log")
-fig.write_html(f'FRF RK vs HB - f {f}.html'.replace(':','_'))
+# # n_plot = 30
+# # fig = go.Figure(data=[go.Scatter(x=np.repeat(omg_range,n_plot),
+# #                                  y=np.array([a[0,-n_plot:] for a in pc]).flatten(),
+# #                                  mode='markers',name='DoF 1 - HB'),])
+# # fig.write_html(f'Bifurcation _ DoF 1 - f {f}.html'.replace(':','_'))
 
-n_plot = 30
-fig = go.Figure(data=[go.Scatter(x=np.repeat(omg_range,n_plot),
-                                 y=np.array([a[0,-n_plot:] for a in pc]).flatten(),
-                                 mode='markers',name='DoF 1 - HB'),])
-fig.write_html(f'Bifurcation _ DoF 1 - f {f}.html'.replace(':','_'))
+
+
+
+# # Plot rotor HB
+
+# omg_range=np.linspace(1,800,200)
+# omg_range2 = omg_range #np.linspace(300,400,25)
+# N=len(omg_range)
+# with open(r'results/out_data_r_det_flextun.pic','rb') as file:
+#     data0=load(file)
+# r_solo = np.array([data0['rsolo_b_map'][j,j] for j in range(N)])
+# r_lin = np.array([data0['r_b_map'][j,j] for j in range(N)])
+
+
+# with open('data_rk f {0_ 1, 1_ (-0-1j)} flextun.pic','rb') as file:
+#     data=load(file)
+# N=len(omg_range)
+# cost_hb=data[1]
+# rms_hb=data[0]
+
+# fig = go.Figure(data=[go.Scatter(x=omg_range2,y=rms_hb[0,:],name='DoF 1 - HB'),
+#                       go.Scatter(x=[omg_range[i] for i in range(len(omg_range2)) if rms_hb[1,i]==1],
+#                                   y=[rms_hb[0,i] for i in range(len(omg_range2)) if rms_hb[1,i]==1],
+#                                   name='Flagged',mode='markers',marker=dict(color='black'),legendgroup='flag'),
+#                                   go.Scatter(x=[omg_range2[i] for i in range(len(omg_range2)) if rms_hb[1,i]==2],
+#             y=[rms_hb[0,i] for i in range(len(omg_range2)) if rms_hb[1,i]==2],
+#             name='Flagged',mode='markers',marker=dict(color='red'),legendgroup='flag'),
+#                                   go.Scatter(x=omg_range,y=1*r_solo/np.sqrt(2),name='Bare Rotor'),
+#                                   go.Scatter(x=omg_range,y=1*r_lin/np.sqrt(2),name='Linear Resonators')])
+# fig.update_yaxes(type="log")
+
+
+# # FFT
+
+# with open('x_rk 330.pic','rb') as file:
+#     data=load(file)
+# N=len(data[1])
+# t=data[1][2*N//3:]
+# x=data[0][2,:][2*N//3:]
+
+# dt=t[1]-t[0]
+# tf=dt*len(t)
+# dw=1/tf
+# wf=1/(2*dt)
+# w=np.arange(0,330*10/2/np.pi,dw)
+# spec=np.abs(np.fft.fft(x)[:len(w)])
+# fig=go.Figure(data=[go.Scatter(x=w*2*np.pi,y=spec)])
 
         
     
