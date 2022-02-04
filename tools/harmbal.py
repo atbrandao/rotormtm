@@ -121,7 +121,9 @@ class Sys_NL:
     def t(self,omg):
 
         w0 = omg / self.nu
-        t = np.linspace(0, 2 * np.pi / w0, 2 * self.N * self.n_harm)
+        dt = 1 / (2 * w0 / (2*np.pi) * self.n_harm * self.N)
+        tf = 1 / (w0/(2*np.pi))
+        t = np.arange(0, tf, dt) # 2 * np.pi / w0, 2 * self.N * self.n_harm)
         t = t.reshape((len(t), 1))
 
         return t
@@ -150,10 +152,10 @@ class Sys_NL:
 
     def f_nl(self,x):
 
-        id_N = np.eye(2*self.N*self.n_harm)
         try:
             self.Snl2
         except:
+            id_N = np.eye(2*self.N*self.n_harm)
             self.Snl2 = np.vstack(
                 [np.hstack([id_N*self.Snl[i,j] for j in range(len(self.Snl))]) for i in range(len(self.Snl))])
 
@@ -163,10 +165,10 @@ class Sys_NL:
 
     def df_dx(self,x):
 
-        id_N = np.eye(2 * self.N * self.n_harm)
         try:
             self.Snl2
         except:
+            id_N = np.eye(2 * self.N * self.n_harm)
             self.Snl2 = np.vstack(
                 [np.hstack([id_N * self.Snl[i, j] for j in range(len(self.Snl))]) for i in range(len(self.Snl))])
 
@@ -237,7 +239,7 @@ class Sys_NL:
 
         return z0.reshape(len(z0))
 
-    def solve_hb(self, f, omg, z0=None, full_output=False, method=None, state_space=False):
+    def solve_hb(self, f, omg, z0=None, full_output=False, method=None, state_space=False, plot_orbit=False):
 
         g = self.gamma(omg)
         gi = la.pinv(self.gamma(omg))
@@ -262,17 +264,22 @@ class Sys_NL:
                 root = res.x
         x = self.gamma(omg) @ root.reshape((len(root), 1))
         x = x.reshape(len(x))
-        x = x.reshape((self.ndof,len(x)//self.ndof))[:,:-1]
+        x = x.reshape((self.ndof,len(x)//self.ndof))#[:,:-1]
         if state_space:
             v = self.dgamma_dt(omg) @ root.reshape((len(root), 1))
             v = v.reshape(len(v))
-            v = v.reshape((self.ndof, len(v) // self.ndof))[:, :-1]
+            v = v.reshape((self.ndof, len(v) // self.ndof))#[:, :-1]
             x = np.vstack([x,
                            v])
-        if full_output:
-            return x, res
+        if plot_orbit:
+            Ni = int(np.round(x.shape[1] / self.nu))
+            fig = self.plot_orbit(x, Ni)
+            return fig, x
         else:
-            return x
+            if full_output:
+                return x, res
+            else:
+                return x
 
     def RK4_NL(self, B, x, dt):
 
@@ -344,9 +351,10 @@ class Sys_NL:
         else:
             return x_out
 
-    def plot_frf(self, omg_range, f, tf=300, dt_base=0.01, rms_rk=None, continuation=True, method=None, probe_dof=None):
+    def plot_frf(self, omg_range, f, tf=300, dt_base=0.01, rms_rk=None,
+                 continuation=True, method=None, probe_dof=None):
 
-        rms_hb = np.zeros((1+self.ndof, len(omg_range)))
+        rms_hb = np.zeros((1+2*self.ndof, len(omg_range)))
         pc = []
         cost_hb = []
 
@@ -364,42 +372,23 @@ class Sys_NL:
         x0 = np.vstack([z0[:self.ndof].reshape((self.ndof, 1)),
                         0 * z0[:self.ndof].reshape((self.ndof, 1))])
 
-
         for i, omg in enumerate(omg_range):
             t0 = time.time()
-            tf = np.round(tf / (2 * np.pi / omg)) * 2 * np.pi / omg
-            dt = 2 * np.pi / omg / (np.round(2 * np.pi / omg / dt_base))
-            t_rk = np.arange(0, tf + dt / 2, dt)
-            if not continuation:
-                x0 = np.vstack([z0[:self.ndof].reshape((self.ndof,1)),
-                                0 * z0[:self.ndof].reshape((self.ndof,1))])
-            if calc:
-                x_rk, x0 = self.solve_transient(f, t_rk, omg, x0.reshape((self.ndof*2, 1)),
-                                                probe_dof=probe_dof, last_x=True, dt=dt)
-                print(f'RK4 took {(time.time() - t0):.1f} seconds to run.')
-            t1 = time.time()
-            # if not continuation:
+
+            # Harmonic Balance
             z0 = self.z0(omg=omg_range[0], f_omg={0: 0})  # None
             try:
-                x_hb, res = self.solve_hb(f, omg, z0=z0, full_output=True, method=method)  # 'ls')
+                x_hb, res = self.solve_hb(f, omg, z0=z0, full_output=True, method=method, state_space=True)  # 'ls')
             except:
-                x_hb, res = self.solve_hb(f, omg, z0=z0, full_output=True, method='ls')  # 'ls')
+                x_hb, res = self.solve_hb(f, omg, z0=z0, full_output=True, method='ls', state_space=True)  # 'ls')
 
+            print(f'Harmonic Balance took {(time.time() - t0):.1f} seconds to run.')
             try:
                 cost_hb.append(res.cost)
                 z0 = res.x
             except:
                 cost_hb.append(np.linalg.norm(res[1]['fvec']))
                 z0 = res[0]
-            print(
-                f'Harmbal took {(time.time() - t1):.1f} seconds to run: {(t1 - t0) / (time.time() - t1):.1f} times faster.')
-
-            if calc:
-                rms_rk[:, i] = np.array(
-                    [np.sqrt(
-                    np.sum((x_rk[i, int((tf / 2) / dt):] - np.mean(x_rk[i, int((tf / 2) / dt):])) ** 2) / (
-                        int((tf / 2) / dt))) for i in range(x_rk.shape[0])])
-                pc.append(poincare_section(x_rk, t_rk, omg, n_points))
 
             rms_hb[:-1, i] = np.array(
                 [np.sqrt(np.sum((x_hb[i, :] - np.mean(x_hb[i, :])) ** 2) / (len(self.t(omg)) - 1)) for i in
@@ -413,6 +402,32 @@ class Sys_NL:
                 if not res.success:
                     print(res.message)
                     rms_hb[-1, i] = 1
+
+            # Runge-Kutta 4th order
+
+            tf = np.round(tf / (2 * np.pi / omg)) * 2 * np.pi / omg
+            dt = 2 * np.pi / omg / (np.round(2 * np.pi / omg / dt_base))
+            t_rk = np.arange(0, tf + dt / 2, dt)
+            if isinstance(continuation,bool):
+                if not continuation:
+                    x0 = np.vstack([z0[:self.ndof].reshape((self.ndof,1)),
+                                    0 * z0[:self.ndof].reshape((self.ndof,1))])
+            else:
+                x0 = x_hb[:, 0]
+            t1 = time.time()
+            if calc:
+                x_rk, x0 = self.solve_transient(f, t_rk, omg, x0.reshape((self.ndof*2, 1)),
+                                                probe_dof=probe_dof, last_x=True, dt=dt)
+
+            print(
+                f'RK4 took {(time.time() - t1):.1f} seconds to run: {(time.time() - t1) / (t1 - t0):.1f} times longer.')
+
+            if calc:
+                rms_rk[:, i] = np.array(
+                    [np.sqrt(
+                    np.sum((x_rk[i, int((tf / 2) / dt):] - np.mean(x_rk[i, int((tf / 2) / dt):])) ** 2) / (
+                        int((tf / 2) / dt))) for i in range(x_rk.shape[0])])
+                pc.append(poincare_section(x_rk, t_rk, omg, n_points))
 
             print(f'Frequency: {omg:.1f} rad/s -> completed.')
             print('---------')
