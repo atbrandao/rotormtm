@@ -41,7 +41,7 @@ cp = 5e-3
 C = cp * K
 
 n_harm = 20
-nu = 1
+nu = 2
 N = 2 # sinal no tempo terá comprimento 2*N*n_harm
 
 S = Sys_NL(M=M,K=K_lin+beta*Snl,Snl=Snl,beta=0,alpha=alpha,
@@ -82,27 +82,77 @@ for f0 in np.arange(0.01, 1, 0.05):
     
     string_f = f'{[(k,np.around(f[k],2)) for k in f]}'
     
-    fig1, fig2 = S.plot_frf(omg_range_up, f, dt_base=0.03, tf=180)
-    fig1.update_layout(title=f'Upsweep - f = {string_f}')
-    fig1.write_html(f'FRF/FRF Upsweep - f = {string_f}.html'.replace(':','_'))
-    fig1.write_image(f'FRF/FRF Upsweep - f = {string_f}.pdf'.replace(':','_'))
-    fig1.write_image(f'FRF/FRF Upsweep - f = {string_f}.png'.replace(':','_'))
+    # fig1, fig2 = S.plot_frf(omg_range_up, f, dt_base=0.03, tf=180)
+    # fig1.update_layout(title=f'Upsweep - f = {string_f}')
+    # fig1.write_html(f'FRF/FRF Upsweep - f = {string_f}.html'.replace(':','_'))
+    # # fig1.write_image(f'FRF/FRF Upsweep - f = {string_f}.pdf'.replace(':','_'))
+    # fig1.write_image(f'FRF/FRF Upsweep - f = {string_f}.png'.replace(':','_'))
     
-    fig2.update_layout(title=f'Upsweep - f = {string_f}')
-    fig2.write_html(f'FRF/Cost Upsweep - f = {string_f}.html'.replace(':','_'))
-    fig2.write_image(f'FRF/Cost Upsweep - f = {string_f}.pdf'.replace(':','_'))
-    fig2.write_image(f'FRF/Cost Upsweep - f = {string_f}.png'.replace(':','_'))
+    # fig2.update_layout(title=f'Upsweep - f = {string_f}')
+    # fig2.write_html(f'FRF/Cost Upsweep - f = {string_f}.html'.replace(':','_'))
+    # # fig2.write_image(f'FRF/Cost Upsweep - f = {string_f}.pdf'.replace(':','_'))
+    # fig2.write_image(f'FRF/Cost Upsweep - f = {string_f}.png'.replace(':','_'))
     
-    fig1, fig2 = S.plot_frf(omg_range_down, f, dt_base=0.03, tf=180)
-    fig1.update_layout(title=f'Downsweep - f = {string_f}')
-    fig1.write_html(f'FRF/FRF Downsweep - f = {string_f}.html'.replace(':','_'))
-    fig1.write_image(f'FRF/FRF Downsweep - f = {string_f}.pdf'.replace(':','_'))
-    fig1.write_image(f'FRF/FRF Downsweep - f = {string_f}.png'.replace(':','_'))
+    # fig1, fig2 = S.plot_frf(omg_range_down, f, dt_base=0.03, tf=180)
+    # fig1.update_layout(title=f'Downsweep - f = {string_f}')
+    # fig1.write_html(f'FRF/FRF Downsweep - f = {string_f}.html'.replace(':','_'))
+    # # fig1.write_image(f'FRF/FRF Downsweep - f = {string_f}.pdf'.replace(':','_'))
+    # fig1.write_image(f'FRF/FRF Downsweep - f = {string_f}.png'.replace(':','_'))
     
-    fig2.update_layout(title=f'Downsweep - f = {string_f}')
-    fig2.write_html(f'FRF/Cost Downsweep - f = {string_f}.html'.replace(':','_'))
-    fig2.write_image(f'FRF/Cost Downsweep - f = {string_f}.pdf'.replace(':','_'))
-    fig2.write_image(f'FRF/Cost Downsweep - f = {string_f}.png'.replace(':','_'))
+    # fig2.update_layout(title=f'Downsweep - f = {string_f}')
+    # fig2.write_html(f'FRF/Cost Downsweep - f = {string_f}.html'.replace(':','_'))
+    # # fig2.write_image(f'FRF/Cost Downsweep - f = {string_f}.pdf'.replace(':','_'))
+    # fig2.write_image(f'FRF/Cost Downsweep - f = {string_f}.png'.replace(':','_'))
+    
+    fig1, fig2 = S.plot_frf(omg_range_down, f, dt_base=0.03, tf=180, continuation='hb')
+    fig1.update_layout(title=f'HB Est - f = {string_f}')
+    fig1.write_html(f'FRF/FRF HB Est - f = {string_f}.html'.replace(':','_'))
+    # fig1.write_image(f'FRF/FRF HB Est - f = {string_f}.pdf'.replace(':','_'))
+    fig1.write_image(f'FRF/FRF HB Est - f = {string_f}.png'.replace(':','_'))
+    
+    fig2.update_layout(title=f'HB Est - f = {string_f}')
+    fig2.write_html(f'FRF/Cost HB Est - f = {string_f}.html'.replace(':','_'))
+    # fig2.write_image(f'FRF/Cost HB Est - f = {string_f}.pdf'.replace(':','_'))
+    fig2.write_image(f'FRF/Cost HB Est - f = {string_f}.png'.replace(':','_'))
+    
+    
+# SImulação individual
+
+
+# n_harm = 100
+# nu = 4
+# N = 2 # sinal no tempo terá comprimento 2*N*n_harm
+
+# S = Sys_NL(M=M,K=K_lin+beta*Snl,Snl=Snl,beta=0,alpha=alpha,
+#            n_harm=n_harm,nu=nu,N=N,cp=cp,C=K_lin*cp)
+
+# S.dof_nl = [1]
+# S.x_eq = x_eq
+
+# omg=13.65
+# x0 = np.array([[0],[x_eq],[0],[0]])
+# tf = np.round(300/(2*np.pi/omg)) * 2*np.pi/omg
+# dt = 2*np.pi/omg / (np.round(2*np.pi/omg / 0.01))
+# t_rk = np.arange(0,tf + dt/2,dt)
+# z0 = S.z0(omg=omg,f_omg={0:0})
+# fig1,x0 = S.solve_hb(f,omg,z0=z0,plot_orbit=True,method=None,state_space=True)
+# fig2,x_rk = S.solve_transient(f,t_rk,omg,x0[:,0].reshape((4,1)),plot_orbit=True,dt=dt)
+
+# fig2.add_trace(fig1.data[0])
+# fig2.add_trace(fig1.data[1])
+# fig2.add_trace(fig1.data[2])
+# fig2.add_trace(fig1.data[3])    
+    
+# w=np.arange(len(t_rk[20000:]))*dt
+# N=len(t_rk[20000:])
+# w=np.arange(N//2)*(1/(dt*N))
+# spec=2/N*np.abs(np.fft.fft(x_rk[0,20000:]))
+# f_spec=go.Figure(data=go.Scatter(x=w,y=spec))
+# f_spec.update_layout(xaxis=dict(range=(0,8)))
+
+# f_spec.update_yaxes(type='log')
+    
+    
     
     
 # def plot_frf(omg_range, )
