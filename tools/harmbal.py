@@ -93,6 +93,7 @@ class Sys_NL:
         self.A = np.vstack(
             [np.hstack([Z, I]),
              np.hstack([la.solve(-self.M, self.K), la.solve(-self.M, self.C)])])
+        self.full_orbit = False
 
 
     def H(self,omg):
@@ -118,12 +119,19 @@ class Sys_NL:
 
         return A_out
 
-    def t(self,omg):
+    def dt(self, omg):
 
         w0 = omg / self.nu
-        dt = 1 / (2 * w0 / (2*np.pi) * self.n_harm * self.N)
+        dt = 1 / (2 * w0 / (2 * np.pi) * self.n_harm * self.N)
+
+        return dt
+
+    def t(self, omg):
+
+        w0 = omg / self.nu
+        dt = self.dt(omg)
         tf = 1 / (w0/(2*np.pi))
-        t = np.arange(0, tf, dt) # 2 * np.pi / w0, 2 * self.N * self.n_harm)
+        t = np.arange(0, tf - dt/2, dt) # 2 * np.pi / w0, 2 * self.N * self.n_harm)
         t = t.reshape((len(t), 1))
 
         return t
@@ -149,6 +157,63 @@ class Sys_NL:
                                                                      np.kron(id_n,-(i+1)*w0*np.sin((i+1)*wt))]) for i in range(self.n_harm)])
 
         return dgamma_dt
+
+    def B(self, f, omg, t):
+
+        F_aux = np.zeros((2*self.ndof, 1))
+        F = np.zeros((self.ndof, 1))
+        for n in f:
+            F[n, 0] = np.real(f[n]) * np.cos(omg * t) + np.imag(f[n]) * np.sin(omg * t)
+
+        F_aux[len(F):, :] = F[:, :]
+        B = self.Minv @ F_aux
+
+        return B
+
+    def dB_dt(self, f, omg, t):
+
+        F_aux = np.zeros((2*self.ndof, 1))
+        F = np.zeros((self.ndof, 1))
+        for n in f:
+            F[n, 0] = - np.real(f[n]) * np.sin(omg * t) + np.imag(f[n]) * np.cos(omg * t)
+
+        F_aux[len(F):, :] = F[:, :]
+        dB_dt = self.Minv @ F_aux
+
+        return dB_dt
+
+    def f_stsp(self, x, B):
+
+        x = np.reshape(x, (len(x), 1))
+        B = np.reshape(B, (len(B), 1))
+        Z = np.zeros((self.ndof, self.ndof))
+
+        A = self.A
+        alpha = self.alpha
+        beta = self.beta
+        Minv = self.Minv
+        Snl_stsp = np.vstack([np.hstack([Z, Z]),
+                              np.hstack([-self.Snl, Z])])
+
+        f_stsp = A @ x + B + Minv @ (beta * Snl_stsp @ x + alpha * (Snl_stsp @ x) ** 3)
+
+        return f_stsp
+
+    def df_stsp_dx(self, x):
+
+        x = np.reshape(x, (len(x), 1))
+        Z = np.zeros((self.ndof, self.ndof))
+
+        A = self.A
+        alpha = self.alpha
+        beta = self.beta
+        Minv = self.Minv
+        Snl_stsp = np.vstack([np.hstack([Z, Z]),
+                              np.hstack([-self.Snl, Z])])
+
+        df_stsp_dx = A + Minv @ (beta * Snl_stsp + 3 * alpha * ((Snl_stsp @ x) ** 2 * np.eye(len(x))) @ Snl_stsp)
+
+        return df_stsp_dx
 
     def f_nl(self,x):
 
@@ -281,6 +346,39 @@ class Sys_NL:
             else:
                 return x
 
+    def floquet_multipliers(self, omg, z, dt_refine=1):
+
+        M = np.eye(len(self.A))
+
+        N0 = self.N
+        self.N = self.N * dt_refine
+
+        t = self.t(omg)
+        dt = self.dt(omg)
+
+        x = self.gamma(omg) @ z
+        v = self.dgamma_dt(omg) @ z
+
+        self.N = N0
+
+        x = x.reshape(len(x))
+        x = x.reshape((self.ndof, len(x) // self.ndof))
+
+        v = v.reshape(len(v))
+        v = v.reshape((self.ndof, len(v) // self.ndof))  # [:, :-1]
+
+        x = np.vstack([x,
+                       v])
+
+        for i, t1 in enumerate(t):
+
+            x1 = x[:, i]
+            M += self.df_stsp_dx(x1) @ M * dt
+
+        fm = la.eig(M)[0]
+
+        return fm
+
     def RK4_NL(self, B, x, dt):
 
         x = np.reshape(x, (len(x), 1))
@@ -290,8 +388,8 @@ class Sys_NL:
         alpha = self.alpha
         beta = self.beta
         Minv = self.Minv
-        Snl2 = np.vstack([np.hstack([Z, Z]),
-                          np.hstack([-self.Snl, Z])])
+        Snl_stsp = np.vstack([np.hstack([Z, Z]),
+                              np.hstack([-self.Snl, Z])])
 
         aux1 = np.zeros((len(B), 1)).astype(type(B[0, 0]))
         aux1[:, 0] = B[:, 0]
@@ -300,17 +398,17 @@ class Sys_NL:
         aux3 = np.zeros((len(B), 1)).astype(type(B[0, 0]))
         aux3[:, 0] = B[:, 2]
 
-        k1 = A @ x + aux1 + Minv @ (beta * Snl2 @ x + alpha * (Snl2 @ x) ** 3)
+        k1 = A @ x + aux1 + Minv @ (beta * Snl_stsp @ x + alpha * (Snl_stsp @ x) ** 3)
         x1 = x + k1 * dt / 2
-        k2 = A @ x1 + aux2 + Minv @ (beta * Snl2 @ x1 + alpha * (Snl2 @ x1) ** 3)
+        k2 = A @ x1 + aux2 + Minv @ (beta * Snl_stsp @ x1 + alpha * (Snl_stsp @ x1) ** 3)
         x2 = x + k2 * dt / 2
-        k3 = A @ x2 + aux2 + Minv @ (beta * Snl2 @ x2 + alpha * (Snl2 @ x2) ** 3)
+        k3 = A @ x2 + aux2 + Minv @ (beta * Snl_stsp @ x2 + alpha * (Snl_stsp @ x2) ** 3)
         x3 = x + k3 * dt
-        k4 = A @ x3 + aux3 + Minv @ (beta * Snl2 @ x3 + alpha * (Snl2 @ x3) ** 3)
+        k4 = A @ x3 + aux3 + Minv @ (beta * Snl_stsp @ x3 + alpha * (Snl_stsp @ x3) ** 3)
 
         return np.reshape(x + dt / 6 * (k1 + 2 * k2 + 2 * k3 + k4), (len(x), 1))
 
-    def solve_transient(self, f, t, omg, x0, probe_dof=None, last_x=False, plot_orbit=False, dt=None):
+    def solve_transient(self, f, t, omg, x0, probe_dof=None, last_x=False, plot_orbit=False, dt=None, orbit3d=False):
 
         if probe_dof is None:
             probe_dof = [i for i in range(len(x0))]
@@ -344,7 +442,16 @@ class Sys_NL:
 
         if plot_orbit:
             Ni = int(np.round(2*np.pi/omg / dt))
-            fig = self.plot_orbit(x_out[:,x_out.shape[1]//2:],Ni)
+            if self.full_orbit:
+                if orbit3d:
+                    fig = self.plot_3d_orbit(x_out[:, :], Ni)
+                else:
+                    fig = self.plot_orbit(x_out[:,:],Ni)
+            else:
+                if orbit3d:
+                    fig = self.plot_3d_orbit(x_out[:, x_out.shape[1] // 2:], Ni)
+                else:
+                    fig = self.plot_orbit(x_out[:,x_out.shape[1]//2:],Ni)
             return fig, x_out
         elif last_x:
             return x_out, x[:,1]
@@ -355,6 +462,7 @@ class Sys_NL:
                  continuation=True, method=None, probe_dof=None):
 
         rms_hb = np.zeros((1+2*self.ndof, len(omg_range)))
+        fm_flag = np.zeros(len(omg_range))
         pc = []
         cost_hb = []
 
@@ -381,8 +489,20 @@ class Sys_NL:
                 x_hb, res = self.solve_hb(f, omg, z0=z0, full_output=True, method=method, state_space=True)  # 'ls')
             except:
                 x_hb, res = self.solve_hb(f, omg, z0=z0, full_output=True, method='ls', state_space=True)  # 'ls')
+            thb = time.time()
+            try:
+                z = res.x
+            except:
+                z = res[0]
 
-            print(f'Harmonic Balance took {(time.time() - t0):.1f} seconds to run.')
+            print(f'Harmonic Balance took {(thb - t0):.1f} seconds to run.')
+
+            fm = self.floquet_multipliers(omg, z)
+            tfm = time.time()
+            print(f'Floquet Multipliers calculation took {(tfm - thb):.1f} seconds to run.')
+            if np.max(np.abs(fm)) > 1:
+                fm_flag[i] = 1
+
             try:
                 cost_hb.append(res.cost)
                 z0 = res.x
@@ -420,7 +540,7 @@ class Sys_NL:
                                                 probe_dof=probe_dof, last_x=True, dt=dt)
 
             print(
-                f'RK4 took {(time.time() - t1):.1f} seconds to run: {(time.time() - t1) / (t1 - t0):.1f} times longer.')
+                f'RK4 took {(time.time() - t1):.1f} seconds to run: {(time.time() - t1) / (thb - t0):.1f} times longer.')
 
             if calc:
                 rms_rk[:, i] = np.array(
@@ -432,12 +552,21 @@ class Sys_NL:
             print(f'Frequency: {omg:.1f} rad/s -> completed.')
             print('---------')
 
+        sl = [False] * (np.max(probe_dof) + 1)
+        sl[probe_dof[0]] = True
         fig = go.Figure(data=[go.Scatter(x=omg_range, y=rms_hb[i, :], name=f'DoF {i}- HB') for i in probe_dof] + \
+                             [go.Scatter(x=omg_range, y=rms_rk[i, :], name=f'DoF {i} - RK') for i in probe_dof] + \
                              [go.Scatter(x=[omg_range[i] for i in range(len(omg_range)) if rms_hb[-1, i] == 1],
                                          y=[rms_hb[j, i] for i in range(len(omg_range)) if rms_hb[-1, i] == 1],
                                          name='Flagged', mode='markers', marker=dict(color='black'),
+                                         showlegend=sl[j],
                                          legendgroup='flag') for j in probe_dof] + \
-                             [go.Scatter(x=omg_range, y=rms_rk[i, :], name=f'DoF {i} - RK') for i in probe_dof])
+                             [go.Scatter(x=[omg_range[i] for i in range(len(omg_range)) if fm_flag[i] == 1],
+                                         y=[rms_hb[j, i] for i in range(len(omg_range)) if fm_flag[i] == 1],
+                                         name='Unstable', mode='markers', marker=dict(color='red',symbol='x'),
+                                         showlegend=sl[j],
+                                         legendgroup='fm_flag') for j in probe_dof]
+                             )
         fig.update_layout(title={'xanchor': 'center',
                                  'x': 0.4,
                                  'font': {'family': 'Arial, bold',
@@ -481,16 +610,17 @@ class Sys_NL:
         return fig, fig_cost
 
     @classmethod
-    def plot_orbit(cls, x, Ni):
+    def plot_orbit(cls, x, Ni, color='black'):
 
         n_probes = x.shape[0] // 2
         fig = go.Figure()
         for i in range(n_probes):
-            fig.add_trace(go.Scatter(x=x[i,:],y=x[i+n_probes,:],
+            fig.add_trace(go.Scatter(x=x[i,:],y=x[i+n_probes,:],mode='lines',
+                                     line=dict(color=color, width=1),
                                      name=f'probe {i}',legendgroup=f'{i}'))
             fig.add_trace(go.Scatter(x=x[i,::Ni],y=x[i+n_probes,::Ni],
                                      name=f'probe {i}',legendgroup=f'{i}',
-                                     mode='markers',showlegend=False,marker=dict(color='red')))
+                                     mode='markers',showlegend=False,marker=dict(color='red',size=5)))
 
         x_range = [np.min(x[:n_probes,:] * 1.1), np.max(x[:n_probes,:] * 1.1)]
         v_range = [np.min(x[n_probes:, :] * 1.1), np.max(x[n_probes:, :] * 1.1)]
@@ -501,10 +631,26 @@ class Sys_NL:
 
         return fig
 
+    @classmethod
+    def plot_3d_orbit(cls, x, Ni, color='black'):
 
+        n_probes = x.shape[0] // 2
+        fig = go.Figure()
+        for i in range(n_probes):
+            fig.add_trace(go.Scatter3d(x=x[i, :], y=x[i + n_probes, :], z=np.arange(len(x[i,:])),mode='lines',
+                                     name=f'probe {i}', legendgroup=f'{i}',line=dict(color=color, width=2)))
+            fig.add_trace(go.Scatter3d(x=x[i, ::Ni], y=x[i + n_probes, ::Ni], z=np.arange(0, len(x[i, :]), Ni),
+                                     name=f'probe {i}', legendgroup=f'{i}',
+                                     mode='markers', showlegend=False, marker=dict(color='red', size=2)))
 
+        x_range = [np.min(x[:n_probes, :] * 1.1), np.max(x[:n_probes, :] * 1.1)]
+        v_range = [np.min(x[n_probes:, :] * 1.1), np.max(x[n_probes:, :] * 1.1)]
+        fig.update_layout(xaxis=dict(title='X',
+                                     range=x_range),
+                          yaxis=dict(title='dX/dt',
+                                     range=v_range))
 
-
+        return fig
 
 #
 # n_harm = 40
