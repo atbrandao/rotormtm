@@ -15,10 +15,10 @@ class RotorMTM:
         self.var = var
         self.var_k = var_k
         self.p_damp = p_damp #1e-4
-        self.ge = ge #True
-        self.dk_r = dk_r #rs.DiskElement(n=0, m=mr, Id=It, Ip=Ip)
-        self.k0 = k0 #mr * f_0 ** 2
-        self.k1 = k1 #It * f_1 ** 2
+        self.ge = ge # True
+        self.dk_r = dk_r # rs.DiskElement(n=0, m=mr, Id=It, Ip=Ip)
+        self.k0 = k0 # mr * f_0 ** 2
+        self.k1 = k1 # It * f_1 ** 2
         self.exp_var = exp_var
 
         self.n_pos = n_pos #np.arange(n_center - int(n_res / 2), n_center + n_res - int(n_res / 2), 1)
@@ -26,7 +26,7 @@ class RotorMTM:
         if isinstance(dk_r,list):
             self.dk_r = dk_r
         else:
-            self.dk_r = [rs.DiskElement(n=n_pos[i],m=dk_r.m,Id=dk_r.Id,Ip=dk_r.Ip,tag=f'{i}') for i in range(len(n_pos))]
+            self.dk_r = [rs.DiskElement(n=n_pos[i], m=dk_r.m, Id=dk_r.Id, Ip=dk_r.Ip, tag=f'{i}') for i in range(len(n_pos))]
 
         for i, d in enumerate(self.dk_r):
             self.dk_r[i].scale_factor = 0.4 * d.m/max([a.m for a in self.dk_r])
@@ -112,6 +112,7 @@ class RotorMTM:
         dof = dof + [a for a in range(self.N2, N + self.N2)]
         # print(dof)
 
+        # todo corrigir considerando var_k
         if connectivity_matrix is not None:
             K = np.zeros(K.shape)
             if connectivity_matrix == 0:
@@ -490,8 +491,6 @@ class RotorMTM:
 
         return Sys
 
-
-
 def plot_diff_modal(w, diff, sp_arr, mode='abs',n_plot=None,saturate=None, colorbar_left=False):
 
     if saturate:
@@ -726,7 +725,7 @@ def plot_campbell(w, sp_arr, f_min=None):
                                   y=1.02, orientation='h'))
     return fig
 
-def plot_frf(r, sp_arr):
+def plot_frf(r, sp_arr, width=1.5):
     
     rsolo = r[0]
     r_det = r[1]
@@ -736,11 +735,14 @@ def plot_frf(r, sp_arr):
     max_y = max_y + 0.1*np.abs(max_y)
     min_y = np.log10(min([np.min(rsolo),np.min(r_det),np.min(r_var)]))
     min_y = min_y - 0.1*np.abs(min_y)
-    fig = go.Figure(data=[go.Scatter(x=sp_arr,y=np.log10(rsolo[:,0]),name='Bare rotor'),
-                          go.Scatter(x=sp_arr,y=np.log10(r_det[:,0]),name='Resonators'),
-                          go.Scatter(x=sp_arr,y=np.log10(r_var[:,0]),name='Rainbow Resonators'),
+    fig = go.Figure(data=[go.Scatter(x=sp_arr,y=np.log10(rsolo[:,0]),name='Bare rotor',
+                                     line=dict(color='black',width=width,dash='5,3')),
+                          go.Scatter(x=sp_arr,y=np.log10(r_det[:,0]),name='Resonators',
+                                     line=dict(dash='10,3,2,3',width=width,color='blue')),
+                          go.Scatter(x=sp_arr,y=np.log10(r_var[:,0]),name='Rainbow Resonators',
+                                     line=dict(width=width,color='red')),
                           go.Scatter(x=[377,377],y=[min_y+10,max_y-10],
-                                    mode='lines',line={'color':'black','dash':'dash','width':1},name='Target frequency'),
+                                    mode='lines',line={'color':'black','dash':'10,3,2,3,2,3','width':1},name='Target frequency'),
                           # go.Scatter(x=[f_1,f_1],y=[min_y,max_y],
                           #            mode='lines',line={'color':'red','dash':'dash','width':1},name='f1'),
                           ])

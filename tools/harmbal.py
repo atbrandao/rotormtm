@@ -3,33 +3,8 @@ import scipy.linalg as la
 from scipy.optimize import newton, least_squares, fsolve
 import plotly.graph_objects as go
 import time
-#
-# m0 = 1
-# m1 = 0.5
-#
-# w0 = 10
-#
-# x_eq = 0.1
-# w1 = 10
-#
-# k0 = w0**2 * m0
-# beta = -1/2 * w1**2 * m1
-# alpha = -beta / x_eq**2
-#
-# M = np.array([[m0 , 0],
-#               [0 , m1]])
-#
-# K_lin = np.array([[k0 , 0],
-#                   [0 , 0]])
-#
-# Snl = np.array(np.array([[1 , -1],
-#                          [-1 , 1]]))
-#
-# K = np.array([[k0 + beta , -beta],
-#               [-beta , beta]])
-#
-# cp = 1e-4
-# C = cp * K
+from pickle import dump, load
+
 
 
 def poincare_section(x, t, omg, n_points=10):
@@ -348,7 +323,7 @@ class Sys_NL:
 
     def floquet_multipliers(self, omg, z, dt_refine=1):
 
-        M = np.eye(len(self.A))
+        M = np.eye(len(self.A)) * 1e-6
 
         N0 = self.N
         self.N = self.N * dt_refine
@@ -370,8 +345,13 @@ class Sys_NL:
         x = np.vstack([x,
                        v])
 
-        for i, t1 in enumerate(t):
+        w_max = np.max(np.imag(np.linalg.eig(self.df_stsp_dx(x[:, 0]))[0]))
+        if np.pi/w_max < dt:
+            print('Time step might be too large.')
+        print(f'Recomended time step: {np.pi/w_max}')
+        print(f'Used time step: {dt}')
 
+        for i, t1 in enumerate(t):
             x1 = x[:, i]
             M += self.df_stsp_dx(x1) @ M * dt
 
@@ -459,7 +439,8 @@ class Sys_NL:
             return x_out
 
     def plot_frf(self, omg_range, f, tf=300, dt_base=0.01, rms_rk=None,
-                 continuation=True, method=None, probe_dof=None):
+                 continuation=True, method=None, probe_dof=None, dt_refine=1,
+                 stability_analysis=True, save_rms_rk=False):
 
         rms_hb = np.zeros((1+2*self.ndof, len(omg_range)))
         fm_flag = np.zeros(len(omg_range))
@@ -471,7 +452,7 @@ class Sys_NL:
 
         if rms_rk is None:
             calc = True
-            rms_rk = np.zeros((len(probe_dof), len(omg_range)))
+            rms_rk = np.zeros((2 * self.ndof, len(omg_range)))
         else:
             calc = False
 
@@ -496,12 +477,14 @@ class Sys_NL:
                 z = res[0]
 
             print(f'Harmonic Balance took {(thb - t0):.1f} seconds to run.')
-
-            fm = self.floquet_multipliers(omg, z)
-            tfm = time.time()
-            print(f'Floquet Multipliers calculation took {(tfm - thb):.1f} seconds to run.')
-            if np.max(np.abs(fm)) > 1:
-                fm_flag[i] = 1
+            if stability_analysis:
+                fm = self.floquet_multipliers(omg, z, dt_refine=dt_refine)
+                tfm = time.time()
+                print(f'Floquet Multipliers calculation took {(tfm - thb):.1f} seconds to run.')
+                if np.max(np.abs(fm)) > 1:
+                    fm_flag[i] = 1
+            else:
+                fm_flag[i] = 0
 
             try:
                 cost_hb.append(res.cost)
@@ -536,8 +519,7 @@ class Sys_NL:
                 x0 = x_hb[:, 0]
             t1 = time.time()
             if calc:
-                x_rk, x0 = self.solve_transient(f, t_rk, omg, x0.reshape((self.ndof*2, 1)),
-                                                probe_dof=probe_dof, last_x=True, dt=dt)
+                x_rk, x0 = self.solve_transient(f, t_rk, omg, x0.reshape((self.ndof*2, 1)), last_x=True, dt=dt)
 
             print(
                 f'RK4 took {(time.time() - t1):.1f} seconds to run: {(time.time() - t1) / (thb - t0):.1f} times longer.')
@@ -551,6 +533,10 @@ class Sys_NL:
 
             print(f'Frequency: {omg:.1f} rad/s -> completed.')
             print('---------')
+
+        if save_rms_rk:
+            with open(f'rms_rk_omg-{omg}_f-{f}.pic'.replace(':', '_'), 'wb') as file:
+                dump(rms_rk, file)
 
         sl = [False] * (np.max(probe_dof) + 1)
         sl[probe_dof[0]] = True
@@ -622,7 +608,9 @@ class Sys_NL:
                                      name=f'probe {i}',legendgroup=f'{i}',
                                      mode='markers',showlegend=False,marker=dict(color='red',size=5)))
 
-        x_range = [np.min(x[:n_probes,:] * 1.1), np.max(x[:n_probes,:] * 1.1)]
+        avgx = np.mean(x[:n_probes,:])
+        x_range = [avgx + (np.min(x[:n_probes,:]) - avgx) * 1.1,
+                   avgx + (np.max(x[:n_probes,:]) - avgx) * 1.1]
         v_range = [np.min(x[n_probes:, :] * 1.1), np.max(x[n_probes:, :] * 1.1)]
         fig.update_layout(xaxis=dict(title='X',
                                      range=x_range),
@@ -651,63 +639,3 @@ class Sys_NL:
                                      range=v_range))
 
         return fig
-
-#
-# n_harm = 40
-# nu = 4
-# N = 8 # sinal no tempo terá comprimento N*n_harm
-#
-# S = Sys(M=M,C=C,K=K_lin,Snl=Snl,beta=beta,alpha=alpha,n_harm=n_harm,nu=nu,N=N)
-#
-# omg = 9
-#
-# f = {0: 1e-2}
-
-# print(S.gamma(omg).shape)
-# print(S.z0(omg=omg,f_omg=f,dof_nl=[1]))
-
-# root = newton(func=S.h, x0=S.z0(omg=omg,f_omg=f,dof_nl=[1]), fprime=S.dh_dz, args=(omg,f),maxiter=200)
-# x1_rms = []
-# x2_rms = []
-# x1_rms_rk = []
-# x2_rms_rk = []
-# omg_arr = np.arange(1,20,.1)
-# for omg in omg_arr:
-#     print(omg)
-#     root = fsolve(func=S.h, x0=S.z0(omg=omg,f_omg=f,dof_nl=[1]), fprime=S.dh_dz, args=(omg,f))
-#     x = S.gamma(omg) @ root.reshape((len(root), 1))
-#     x = x.reshape(len(x))
-#     x1_rms.append(np.sqrt(np.sum(x[:len(x)//S.ndof]**2))/S.t(omg)[-1,0])
-#     x2_rms.append(np.sqrt(np.sum((x[len(x) // S.ndof:] - x_eq) ** 2)) / S.t(omg)[-1,0])
-#     tf = 100
-#     dt = 0.01
-#     x = S.solve_transient(f,np.arange(0,tf,dt),omg,np.array([[0],[x_eq],[0],[0]]))
-#     x1_rms_rk.append(np.sqrt(np.sum((x[0,int((tf/2)/dt):] - np.mean(x[0,int((tf/2)/dt):])) ** 2)) / (tf/2))
-#     x2_rms_rk.append(np.sqrt(np.sum((x[1,int((tf/2)/dt):] - np.mean(x[1,int((tf/2)/dt):])) ** 2)) / (tf/2))
-#
-# fig = go.Figure(data=[go.Scatter(x=omg_arr,y=np.log10(np.array(x1_rms)),name='DoF 1'),
-#                       go.Scatter(x=omg_arr,y=np.log10(np.array(x2_rms)),name='DoF 2')])
-# fig.write_html('FRF.html')
-#
-# fig = go.Figure(data=[go.Scatter(x=omg_arr,y=np.log10(np.array(x1_rms)),name='DoF 1'),
-#                       go.Scatter(x=omg_arr,y=np.log10(np.array(x2_rms)),name='DoF 2'),
-#                       go.Scatter(x=omg_arr,y=np.log10(np.array(x1_rms_rk)),name='DoF 1 RK'),
-#                       go.Scatter(x=omg_arr,y=np.log10(np.array(x2_rms_rk)),name='DoF 2 RK')])
-# fig.write_html('FRF_rk_comp.html')
-#
-# # root = least_squares(fun=S.h, x0=S.z0(omg=omg,f_omg=f,dof_nl=[1]), jac=S.dh_dz, args=(omg,f))
-#
-# print(root)
-# print(S.z0(omg=omg,f_omg=f,dof_nl=[1]))
-#
-# x1 = S.gamma(omg) @ root.reshape((len(root), 1))
-# x1 = x1.reshape(len(x1))
-# fig = go.Figure(data=[go.Scatter(x=S.t(omg).reshape(len(x1)//S.ndof),y=x1[:len(x1)//S.ndof]),
-#                       go.Scatter(x=S.t(omg).reshape(len(x1)//S.ndof),y=x1[len(x1)//S.ndof:]-x_eq)])
-# fig.write_html('waveform.html')
-#
-# fig = go.Figure(data=[go.Scatter(x=np.arange(0,tf,dt),y=x[0,:]),
-#                       go.Scatter(x=np.arange(0,tf,dt),y=x[1,:]-x_eq)])
-# fig.write_html('waveform_rk.html')
-#
-# print('')
