@@ -469,7 +469,7 @@ class Sys_NL:
 
     def plot_frf(self, omg_range, f, tf=300, dt_base=0.01, rms_rk=None,
                  continuation=True, method=None, probe_dof=None, dt_refine=None,
-                 stability_analysis=True, save_rms_rk=None):
+                 stability_analysis=True, save_rms_rk=None, save_rms_hb=None):
 
         rms_hb = np.zeros((1+2*self.ndof, len(omg_range)))
         fm_flag = np.zeros(len(omg_range))
@@ -567,6 +567,11 @@ class Sys_NL:
         if save_rms_rk:
             with open(save_rms_rk, 'wb') as file:
                 dump(rms_rk, file)
+
+        if save_rms_hb:
+            with open(save_rms_hb, 'wb') as file:
+                dump({'rms_hb': rms_hb,
+                      'fm_flag': fm_flag}, file)
 
         sl = [False] * (np.max(probe_dof) + 1)
         sl[probe_dof[0]] = True
