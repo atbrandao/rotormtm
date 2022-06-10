@@ -323,7 +323,7 @@ class Sys_NL:
 
     def floquet_multipliers(self, omg, z, dt_refine=1):
 
-        M = np.eye(len(self.A)) * 1e-6
+        M = np.eye(len(self.A))# * 1e-6
 
         N0 = self.N
         self.N = self.N * dt_refine
@@ -440,7 +440,7 @@ class Sys_NL:
 
     def plot_frf(self, omg_range, f, tf=300, dt_base=0.01, rms_rk=None,
                  continuation=True, method=None, probe_dof=None, dt_refine=1,
-                 stability_analysis=True, save_rms_rk=False):
+                 stability_analysis=True, save_rms_rk=None):
 
         rms_hb = np.zeros((1+2*self.ndof, len(omg_range)))
         fm_flag = np.zeros(len(omg_range))
@@ -508,7 +508,8 @@ class Sys_NL:
 
             # Runge-Kutta 4th order
 
-            tf = np.round(tf / (2 * np.pi / omg)) * 2 * np.pi / omg
+            n_periods = max([1, np.round(tf / (2 * np.pi / omg))])
+            tf = n_periods * 2 * np.pi / omg
             dt = 2 * np.pi / omg / (np.round(2 * np.pi / omg / dt_base))
             t_rk = np.arange(0, tf + dt / 2, dt)
             if isinstance(continuation,bool):
@@ -535,7 +536,7 @@ class Sys_NL:
             print('---------')
 
         if save_rms_rk:
-            with open(f'rms_rk_omg-{omg}_f-{f}.pic'.replace(':', '_'), 'wb') as file:
+            with open(save_rms_rk, 'wb') as file:
                 dump(rms_rk, file)
 
         sl = [False] * (np.max(probe_dof) + 1)
