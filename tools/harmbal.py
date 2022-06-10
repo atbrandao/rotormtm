@@ -101,32 +101,32 @@ class Sys_NL:
 
         return dt
 
-    def t(self, omg):
+    def t(self, omg, t0=0):
 
         w0 = omg / self.nu
         dt = self.dt(omg)
         tf = 1 / (w0/(2*np.pi))
-        t = np.arange(0, tf - dt/2, dt) # 2 * np.pi / w0, 2 * self.N * self.n_harm)
+        t = np.arange(t0, tf - dt/10, dt) # 2 * np.pi / w0, 2 * self.N * self.n_harm)
         t = t.reshape((len(t), 1))
 
         return t
 
-    def gamma(self, omg):
+    def gamma(self, omg, t0=0):
 
         id_n = np.eye(self.ndof)
         w0 = omg/self.nu
-        wt = w0 * self.t(omg)
+        wt = w0 * self.t(omg, t0=t0)
         # print(wt)
         gamma = np.hstack([np.kron(id_n,np.cos(0*wt))] + [np.hstack([np.kron(id_n,np.sin((i+1)*wt)),
                                                                      np.kron(id_n,np.cos((i+1)*wt))]) for i in range(self.n_harm)])
 
         return gamma
 
-    def dgamma_dt(self, omg):
+    def dgamma_dt(self, omg, t0=0):
 
         id_n = np.eye(self.ndof)
         w0 = omg/self.nu
-        wt = w0 * self.t(omg)
+        wt = w0 * self.t(omg, t0=t0)
         # print(wt)
         dgamma_dt = np.hstack([np.kron(id_n,0*np.cos(0*wt))] + [np.hstack([np.kron(id_n,(i+1)*w0*np.cos((i+1)*wt)),
                                                                      np.kron(id_n,-(i+1)*w0*np.sin((i+1)*wt))]) for i in range(self.n_harm)])
@@ -321,43 +321,72 @@ class Sys_NL:
             else:
                 return x
 
-    def floquet_multipliers(self, omg, z, dt_refine=1):
+    def floquet_multipliers(self, omg, z, dt_refine=None):
 
-        M = np.eye(len(self.A))# * 1e-6
+        M = np.eye(len(self.A))
+
+        if dt_refine is None:
+            dt_refine = np.ceil(self.dt(omg) / self.dt_max())
 
         N0 = self.N
         self.N = self.N * dt_refine
 
         t = self.t(omg)
         dt = self.dt(omg)
+        t2 = self.t(omg, t0=dt / 2)
 
         x = self.gamma(omg) @ z
         v = self.dgamma_dt(omg) @ z
+        x2 = self.gamma(omg, t0=dt / 2) @ z
+        v2 = self.dgamma_dt(omg, t0=dt / 2) @ z
 
         self.N = N0
 
         x = x.reshape(len(x))
         x = x.reshape((self.ndof, len(x) // self.ndof))
-
         v = v.reshape(len(v))
-        v = v.reshape((self.ndof, len(v) // self.ndof))  # [:, :-1]
+        v = v.reshape((self.ndof, len(v) // self.ndof))
+
+        x2 = x2.reshape(len(x2))
+        x2 = x2.reshape((self.ndof, len(x2) // self.ndof))
+        v2 = v2.reshape(len(v2))
+        v2 = v2.reshape((self.ndof, len(v2) // self.ndof))
 
         x = np.vstack([x,
                        v])
-
-        w_max = np.max(np.imag(np.linalg.eig(self.df_stsp_dx(x[:, 0]))[0]))
-        if np.pi/w_max < dt:
-            print('Time step might be too large.')
-        print(f'Recomended time step: {np.pi/w_max}')
-        print(f'Used time step: {dt}')
+        x2 = np.vstack([x2,
+                        v2])
 
         for i, t1 in enumerate(t):
-            x1 = x[:, i]
-            M += self.df_stsp_dx(x1) @ M * dt
+            x_1 = x[:, i]
+            x_2 = x2[:,i]
+            if i + 1 < len(t):
+                x_3 = x[:, i + 1]
+            else:
+                x_3 = x[:, 0]
+
+            k1 = self.df_stsp_dx(x_1) @ M
+            M1 = M + k1 * dt / 2
+            k2 = self.df_stsp_dx(x_2) @ M1
+            M2 = M + k2 * dt / 2
+            k3 = self.df_stsp_dx(x_2) @ M2
+            M3 = M + k3 * dt
+            k4 = self.df_stsp_dx(x_3) @ M3
+
+            M += dt / 6 * (k1 + 2 * k2 + 2 * k3 + k4)
 
         fm = la.eig(M)[0]
 
         return fm
+
+    def dt_max(self):
+        '''
+        Maximum recommended value of time step for direct integration.
+        '''
+
+        dt_max = 0.5 * np.pi / np.max(np.imag(np.linalg.eig(self.A_lin)[0]))
+
+        return dt_max
 
     def RK4_NL(self, B, x, dt):
 
@@ -439,7 +468,7 @@ class Sys_NL:
             return x_out
 
     def plot_frf(self, omg_range, f, tf=300, dt_base=0.01, rms_rk=None,
-                 continuation=True, method=None, probe_dof=None, dt_refine=1,
+                 continuation=True, method=None, probe_dof=None, dt_refine=None,
                  stability_analysis=True, save_rms_rk=None):
 
         rms_hb = np.zeros((1+2*self.ndof, len(omg_range)))
