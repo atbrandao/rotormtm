@@ -58,19 +58,31 @@ t_rk = np.arange(0, tf, dt)
 x0 = x_hb[:, 0].reshape((sys.ndof*2, 1))
 # x_rk4 = sys.solve_transient(f=f, omg=omg, t=t_rk, x0=x0)#np.zeros((sys.ndof * 2, 1)))
 
-try:
-    with open(f'rms_rk_f-{f}.pic'.replace(':', '_'), 'rb') as file:
-        rms_rk = load(file)
-        save_rms = None
-except:
-    rms_rk = None
-    save_rms = f'rms_rk_f-{f}.pic'.replace(':', '_')
 
 omg_range = np.arange(1, 500, 1)
 
 # rms_rk = 1e-5 * np.ones((2*sys.ndof, len(omg_range)))
 
-fig = sys.plot_frf(omg_range=omg_range, tf=tf, dt_base=dt, stability_analysis=True, dt_refine=None,
-                   f=f, probe_dof=[N-1], continuation='hb', save_rms_rk=save_rms, rms_rk=rms_rk)
-fig[0].write_html(f'NL_Chain/frf_omg-{omg}_f-{f}.html'.replace(':', '_'))
-fig[1].write_html(f'NL_Chain/frf_cost_omg-{omg}_f-{f}.html'.replace(':', '_'))
+f_range = np.arange(8) + 1
+
+for f0 in f_range:
+    f = {0: 1e3}
+
+    try:
+        with open(f'NL_Chain/data/rms_rk_f-{f}.pic'.replace(':', '_'), 'rb') as file:
+            rms_rk = load(file)
+            save_rms = None
+    except:
+        rms_rk = None
+        save_rms = f'NL_Chain/data/rms_rk_f-{f}.pic'.replace(':', '_')
+    save_hb = f'NL_Chain/data/rms_hb_f-{f}.pic'.replace(':', '_')
+
+    fig = sys.plot_frf(omg_range=omg_range, tf=tf, dt_base=dt, stability_analysis=True, dt_refine=None,
+                       f=f, probe_dof=[N-1], continuation='hb', save_rms_rk=save_rms, save_rms_hb=save_hb,
+                       rms_rk=rms_rk)
+    fig[0].write_html(f'NL_Chain/frf_omg-{omg}_f-{f}.html'.replace(':', '_'))
+    fig[1].write_html(f'NL_Chain/frf_cost_omg-{omg}_f-{f}.html'.replace(':', '_'))
+    fig[0].write_image(f'NL_Chain/frf_omg-{omg}_f-{f}.pdf'.replace(':', '_'))
+    fig[1].write_image(f'NL_Chain/frf_cost_omg-{omg}_f-{f}.pdf'.replace(':', '_'))
+    fig[0].write_image(f'NL_Chain/frf_omg-{omg}_f-{f}.png'.replace(':', '_'), scale=8)
+    fig[1].write_image(f'NL_Chain/frf_cost_omg-{omg}_f-{f}.png'.replace(':', '_'), scale=8)
