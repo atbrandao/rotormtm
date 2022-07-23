@@ -53,9 +53,13 @@ class Sys_NL:
         self.K_lin = self.K - self.Snl * 2 * self.beta
 
         self.dof_nl = []
+        self.base_dof = []
         for i in range(len(self.Snl)):
-            if self.K[i, i] == 0 and self.Snl[i, i] != 0:
-                self.dof_nl.append(i)
+            if self.Snl[i, i] != 0:
+                if self.K[i, i] == 0:
+                    self.dof_nl.append(i)
+                else:
+                    self.base_dof.append(i)
 
         Z = np.zeros((self.ndof, self.ndof))
         I = np.eye(self.ndof)
@@ -417,7 +421,8 @@ class Sys_NL:
 
         return np.reshape(x + dt / 6 * (k1 + 2 * k2 + 2 * k3 + k4), (len(x), 1))
 
-    def solve_transient(self, f, t, omg, x0, probe_dof=None, last_x=False, plot_orbit=False, dt=None, orbit3d=False):
+    def solve_transient(self, f, t, omg, x0, probe_dof=None, last_x=False,
+                        plot_orbit=False, dt=None, orbit3d=False):
 
         if probe_dof is None:
             probe_dof = [i for i in range(len(x0))]
@@ -439,11 +444,12 @@ class Sys_NL:
                 F[n, 0] = np.real(f[n]) * np.cos(omg * t[i-1]) + np.imag(f[n]) * np.sin(omg * t[i-1])
                 F[n, 1] = np.real(f[n]) * np.cos(omg * t[i-1]+dt/2) + np.imag(f[n]) * np.sin(omg * t[i-1]+dt/2)
                 F[n, 2] = np.real(f[n]) * np.cos(omg * t[i-1]+dt) + np.imag(f[n]) * np.sin(omg * t[i-1]+dt)
+
             F_aux[len(F):, :] = F
             B_aux = self.Minv @ F_aux
-            # print(B_aux)
+
             x[:,1] = self.RK4_NL(B_aux,x[:,0],dt)[:,0]
-            # print(np.round(100 * i / len(t)))
+
             if np.round(10*i/len(t)) > np.round(10*(i-1)/len(t)):
                 print(np.round(100*i/len(t)))
             x_out[:,i] = x[probe_dof,1]
@@ -467,9 +473,201 @@ class Sys_NL:
         else:
             return x_out
 
+    def power_in(self, x, F):
+        """
+        This function computes the instantaneous power input from a excitation source F into the system
+        with state x.
+
+        Parameters
+        -------
+        x: array
+            State space vector of the system's state at a particular point in time.
+
+        F: array
+            Vector containing the instantaneous force, in Newtons, applied to each of the system's DoFs.
+
+        Returns
+        -------
+        array
+            Array with the power input, in Watts, of each of the system's DoFs.
+
+        """
+
+        if len(x.shape) > 1:
+            v = x[self.ndof:, :]
+        else:
+            v = x[self.ndof:]
+        power_in = F * v
+
+        return power_in
+
+    def kinetic_energy(self, x):
+        """
+        System's instantaneous kinetic energy given a state x.
+
+        Parameters
+        -------
+        x: array
+            State space vector of the system's state at a particular point in time.
+
+        Returns
+        -------
+        array
+            Array with the kinetic energy, in Joules, of each of the system's DoFs.
+
+        """
+
+        if len(x.shape) > 1:
+            v = x[self.ndof:, :]
+        else:
+            v = x[self.ndof:]
+
+        kinetic_energy = self.M @ v**2 / 2
+
+        return kinetic_energy
+
+    def base_potential_energy(self, x):
+        """
+        Calculates the base structure instantaneous potential energy, which excludes
+         the potential energy stored on the Duffin oscillators, given a state x.
+
+        Parameters
+        -------
+        x: array
+            State space vector of the system's state at a particular point in time.
+
+        Returns
+        -------
+        array
+            Array with the base structures total potential energy, in Joules, of each given x.
+
+        """
+
+        if len(x.shape) > 1:
+            x = x[:self.ndof, :]
+        else:
+            x = x[:self.ndof, :].reshape((self.ndof, 1))
+
+        potential_energy = 1/2 * x.transpose() @ self.K @ x
+
+        return potential_energy
+
+    def dof_nl_potential_energy(self, x):
+        """
+        Calculates the system's instantaneous potential energy on the nonlinear attachments given a state x.
+
+        Parameters
+        -------
+        x: array
+            State space vector of the system's state at a particular point in time.
+
+        Returns
+        -------
+        array
+            Array with the potential energy, in Joules, of each of the system's nonlinear DoFs.
+
+        """
+
+        if len(x.shape) > 1:
+            x = x[:self.ndof, :]
+        else:
+            x = x[:self.ndof, :].reshape((self.ndof, 1))
+
+        potential_energy = 1/2 * self.beta * (self.Snl[self.dof_nl, :] @ x) ** 2 \
+                           + 1/4 * self.alpha * (self.Snl[self.dof_nl, :] @ x) ** 4
+
+        return potential_energy
+
+    def dof_nl_forces(self, x):
+        """
+        Calculates the forces to which the nonlinear DoFs are subjected to given a certain state x.
+
+        Parameters
+        -------
+        x: array
+            State space vector of the system's state at a particular point in time.
+
+        Returns
+        -------
+        array
+            Array with the damping forces, in Newtons, applied on each of the system's nonlinear DoFs.
+
+        array
+            Array with the elastic forces, in Newtons, applied on each of the system's nonlinear DoFs.
+
+        """
+
+        if len(x.shape) > 1:
+            v = x[self.ndof:, :]
+            x = x[:self.ndof, :]
+        else:
+            v = x[self.ndof:].reshape((self.ndof, 1))
+            x = x[:self.ndof, :].reshape((self.ndof, 1))
+
+        # x = x[:self.ndof]
+        F_damping = - self.C[self.dof_nl, :] @ v
+        F_elastic = - self.K[self.dof_nl, :] @ x \
+                    - self.beta * self.Snl[self.dof_nl, :] @ x \
+                    - self.alpha * (self.Snl[self.dof_nl, :] @ x) ** 3
+
+        return F_damping, F_elastic
+
+    def dof_nl_energy_flow(self, x):
+        """
+        Calculates the energy flow from main structure to nonlinear resonators at a given state x.
+
+        Parameters
+        -------
+        x: array
+            State space vector of the system's state at a particular point in time.
+
+        Returns
+        -------
+        array
+            Array with the energy flow, in Watts, going into each of the system's nonlinear DoFs.
+        """
+
+        if len(x.shape) > 1:
+            v = x[self.ndof:, :][self.dof_nl, :]
+        else:
+            v = x[self.ndof:].reshape((self.ndof, 1))[self.dof_nl, :]
+
+        Fd, Fe = self.dof_nl_forces(x)
+        F = Fd + Fe
+        energy_flow = F * v
+
+        return energy_flow
+
+    def base_structure_energy_flow(self, x):
+        """
+        Calculates the energy flow from nonlinear resonators to main structure at a given state x.
+
+        Parameters
+        -------
+        x: array
+            State space vector of the system's state at a particular point in time.
+
+        Returns
+        -------
+        array
+            Array with the energy flow, in Watts, going into each of the base structure's DoFs.
+        """
+
+        if len(x.shape) > 1:
+            v = x[self.ndof:, :][self.base_dof, :]
+        else:
+            v = x[self.ndof:].reshape((self.ndof, 1))[self.base_dof, :]
+
+        Fd, Fe = self.dof_nl_forces(x)
+        F = Fd + Fe
+        energy_flow = - F * v
+
+        return energy_flow
+
     def plot_frf(self, omg_range, f, tf=300, dt_base=0.01, rms_rk=None,
                  continuation=True, method=None, probe_dof=None, dt_refine=None,
-                 stability_analysis=True, save_rms_rk=None, save_rms_hb=None):
+                 stability_analysis=True, save_rms_rk=None, save_rms_hb=None,
+                 energy_analysis=False):
 
         rms_hb = np.zeros((1+2*self.ndof, len(omg_range)))
         fm_flag = np.zeros(len(omg_range))
@@ -484,6 +682,9 @@ class Sys_NL:
             rms_rk = np.zeros((2 * self.ndof, len(omg_range)))
         else:
             calc = False
+
+        if energy_analysis:
+            calc = True
 
         n_points = 50
         z0 = self.z0(omg=omg_range[0], f_omg={0: 0})  # None
@@ -629,6 +830,14 @@ class Sys_NL:
         fig_cost.update_yaxes(type="log")
 
         return fig, fig_cost
+
+    def eq_linear_system(self):
+
+        eq_sys = Sys_NL(self.M, self.K_lin, self.Snl, beta=0, alpha=0, C=self.C)
+        eq_sys.dof_nl = self.dof_nl
+        eq_sys.base_dof = self.base_dof
+
+        return eq_sys
 
     @classmethod
     def plot_orbit(cls, x, Ni, color='black'):
