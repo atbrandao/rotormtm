@@ -501,7 +501,7 @@ class Sys_NL:
 
         return power_in
 
-    def kinetic_energy(self, x):
+    def kinetic_energy(self, x, dof=None):
         """
         System's instantaneous kinetic energy given a state x.
 
@@ -517,16 +517,22 @@ class Sys_NL:
 
         """
 
-        if len(x.shape) > 1:
-            v = x[self.ndof:, :]
+        if dof is None:
+            dof = [a + self.ndof for a in range(self.ndof)]
         else:
-            v = x[self.ndof:]
+            dof = [a + self.ndof for a in dof]
 
-        kinetic_energy = self.M @ v**2 / 2
+        if len(x.shape) > 1:
+            v = x[dof, :]
+        else:
+            v = x[dof].reshape((len(dof), 1))
+
+        # kinetic_energy = self.M @ v**2 / 2
+        kinetic_energy = 1 / 2 * np.sum(v * (self.M[np.ix_(dof, dof)] @ v), 0)
 
         return kinetic_energy
 
-    def base_potential_energy(self, x):
+    def base_potential_energy(self, x, dof=None):
         """
         Calculates the base structure instantaneous potential energy, which excludes
          the potential energy stored on the Duffin oscillators, given a state x.
@@ -536,19 +542,29 @@ class Sys_NL:
         x: array
             State space vector of the system's state at a particular point in time.
 
+        dof: list
+            A list of the linear DoFs to be considered for the potential energy calculation.
+
         Returns
         -------
         array
             Array with the base structures total potential energy, in Joules, of each given x.
-
         """
 
-        if len(x.shape) > 1:
-            x = x[:self.ndof, :]
+        if dof is None:
+            dof = [a for a in range(self.ndof)]
         else:
-            x = x[:self.ndof, :].reshape((self.ndof, 1))
+            dof = list(dof)
 
-        potential_energy = 1/2 * x.transpose() @ self.K @ x
+        if len(x.shape) > 1:
+            x = x[dof, :]
+        else:
+            x = x[dof].reshape((len(dof), 1))
+
+        potential_energy = 1/2 * np.sum(x * (self.K[np.ix_(dof,dof)] @ x), 0)
+
+        # if len(x.shape) > 1:
+        #     potential_energy = np.diag(potential_energy)
 
         return potential_energy
 
