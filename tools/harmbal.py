@@ -30,6 +30,8 @@ def poincare_section(x, t, omg, n_points=10):
 
 class Sys_NL:
 
+
+
     def __init__(self,M,K,Snl,beta,alpha,n_harm=10,nu=1,N=2,cp=1e-4,C=None):
 
         self.M = M
@@ -115,22 +117,32 @@ class Sys_NL:
 
         return t
 
-    def gamma(self, omg, t0=0):
+    def gamma(self, omg, t0=0, t=None):
+
+        if t is None:
+            t = self.t(omg, t0=t0)
+        else:
+            t = t.reshape((len(t), 1))
 
         id_n = np.eye(self.ndof)
         w0 = omg/self.nu
-        wt = w0 * self.t(omg, t0=t0)
+        wt = w0 * t # self.t(omg, t0=t0)
         # print(wt)
         gamma = np.hstack([np.kron(id_n,np.cos(0*wt))] + [np.hstack([np.kron(id_n,np.sin((i+1)*wt)),
                                                                      np.kron(id_n,np.cos((i+1)*wt))]) for i in range(self.n_harm)])
 
         return gamma
 
-    def dgamma_dt(self, omg, t0=0):
+    def dgamma_dt(self, omg, t0=0, t=None):
+
+        if t is None:
+            t = self.t(omg, t0=t0)
+        else:
+            t = t.reshape((len(t), 1))
 
         id_n = np.eye(self.ndof)
         w0 = omg/self.nu
-        wt = w0 * self.t(omg, t0=t0)
+        wt = w0 * t
         # print(wt)
         dgamma_dt = np.hstack([np.kron(id_n,0*np.cos(0*wt))] + [np.hstack([np.kron(id_n,(i+1)*w0*np.cos((i+1)*wt)),
                                                                      np.kron(id_n,-(i+1)*w0*np.sin((i+1)*wt))]) for i in range(self.n_harm)])
@@ -452,8 +464,8 @@ class Sys_NL:
 
             if np.round(10*i/len(t)) > np.round(10*(i-1)/len(t)):
                 print(np.round(100*i/len(t)))
-            x_out[:,i] = x[probe_dof,1]
-            x[:,0] = x[:,1]
+            x_out[:,i] = x[probe_dof, 1]
+            x[:,0] = x[:, 1]
 
         if plot_orbit:
             Ni = int(np.round(2*np.pi/omg / dt))
@@ -461,7 +473,7 @@ class Sys_NL:
                 if orbit3d:
                     fig = self.plot_3d_orbit(x_out[:, :], Ni)
                 else:
-                    fig = self.plot_orbit(x_out[:,:],Ni)
+                    fig = self.plot_orbit(x_out[:,:], Ni)
             else:
                 if orbit3d:
                     fig = self.plot_3d_orbit(x_out[:, x_out.shape[1] // 2:], Ni)
@@ -518,16 +530,17 @@ class Sys_NL:
         """
 
         if dof is None:
-            dof = [a + self.ndof for a in range(self.ndof)]
+            dof = [a for a in range(self.ndof)]
         else:
-            dof = [a + self.ndof for a in dof]
+            dof = list(dof)
 
         if len(x.shape) > 1:
-            v = x[dof, :]
+            v = x[self.ndof:, :]
+            v = v[dof, :]
         else:
-            v = x[dof].reshape((len(dof), 1))
+            v = x[self.ndof:]
+            v = v[dof].reshape((len(dof), 1))
 
-        # kinetic_energy = self.M @ v**2 / 2
         kinetic_energy = 1 / 2 * np.sum(v * (self.M[np.ix_(dof, dof)] @ v), 0)
 
         return kinetic_energy
@@ -561,7 +574,7 @@ class Sys_NL:
         else:
             x = x[dof].reshape((len(dof), 1))
 
-        potential_energy = 1/2 * np.sum(x * (self.K[np.ix_(dof,dof)] @ x), 0)
+        potential_energy = 1 / 2 * np.sum(x * (self.K[np.ix_(dof,dof)] @ x), 0)
 
         # if len(x.shape) > 1:
         #     potential_energy = np.diag(potential_energy)
@@ -689,6 +702,7 @@ class Sys_NL:
         fm_flag = np.zeros(len(omg_range))
         pc = []
         cost_hb = []
+        cost_hb = []
 
         if probe_dof is None:
             probe_dof = [i for i in range(self.ndof)]
@@ -723,14 +737,7 @@ class Sys_NL:
                 z = res[0]
 
             print(f'Harmonic Balance took {(thb - t0):.1f} seconds to run.')
-            if stability_analysis:
-                fm = self.floquet_multipliers(omg, z, dt_refine=dt_refine)
-                tfm = time.time()
-                print(f'Floquet Multipliers calculation took {(tfm - thb):.1f} seconds to run.')
-                if np.max(np.abs(fm)) > 1:
-                    fm_flag[i] = 1
-            else:
-                fm_flag[i] = 0
+            
 
             try:
                 cost_hb.append(res.cost)
@@ -747,10 +754,28 @@ class Sys_NL:
                 if res[-2] != 1:
                     print(res[-1])
                     rms_hb[-1, i] = 1
+                else:
+                    if stability_analysis:
+                        fm = self.floquet_multipliers(omg, z, dt_refine=dt_refine)
+                        tfm = time.time()
+                        print(f'Floquet Multipliers calculation took {(tfm - thb):.1f} seconds to run.')
+                        if np.max(np.abs(fm)) > 1:
+                            fm_flag[i] = 1
+                    else:
+                        fm_flag[i] = 0
             except:
                 if not res.success:
                     print(res.message)
                     rms_hb[-1, i] = 1
+                else:
+                    if stability_analysis:
+                        fm = self.floquet_multipliers(omg, z, dt_refine=dt_refine)
+                        tfm = time.time()
+                        print(f'Floquet Multipliers calculation took {(tfm - thb):.1f} seconds to run.')
+                        if np.max(np.abs(fm)) > 1:
+                            fm_flag[i] = 1
+                    else:
+                        fm_flag[i] = 0
 
             # Runge-Kutta 4th order
 
@@ -792,8 +817,8 @@ class Sys_NL:
 
         sl = [False] * (np.max(probe_dof) + 1)
         sl[probe_dof[0]] = True
-        fig = go.Figure(data=[go.Scatter(x=omg_range, y=rms_hb[i, :], name=f'DoF {i}- HB') for i in probe_dof] + \
-                             [go.Scatter(x=omg_range, y=rms_rk[i, :], name=f'DoF {i} - RK') for i in probe_dof] + \
+        fig = go.Figure(data=[go.Scatter(x=omg_range, y=rms_hb[i, :], name=f'DoF {i}- HBM') for i in probe_dof] + \
+                             [go.Scatter(x=omg_range, y=rms_rk[i, :], name=f'DoF {i} - RK4') for i in probe_dof] + \
                              [go.Scatter(x=[omg_range[i] for i in range(len(omg_range)) if rms_hb[-1, i] == 1],
                                          y=[rms_hb[j, i] for i in range(len(omg_range)) if rms_hb[-1, i] == 1],
                                          name='Flagged', mode='markers', marker=dict(color='black'),
