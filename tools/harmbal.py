@@ -17,14 +17,14 @@ def poincare_section(x, t, omg, n_points=10):
     if len(x.shape) == 1:
         x2 = np.interp(t2, t, x)
         pc = x2[::N]
+        pc = pc[-n_points:]
     else:
         x2 = np.zeros((x.shape[0],len(t2)))
         for i in range(len(x[:, 1])):
             x2[i, :] = np.interp(t2, t, x[i, :])
         pc = x2[:, ::N]
+        pc = pc[:, -n_points:]
 
-    if n_points < pc.shape[1]:
-        pc = pc[-n_points:]
 
     return pc
 
