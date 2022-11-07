@@ -513,7 +513,7 @@ class Sys_NL:
 
         return power_in
 
-    def kinetic_energy(self, x, dof=None):
+    def kinetic_energy(self, x, dof=None, separate_dof=False):
         """
         System's instantaneous kinetic energy given a state x.
 
@@ -541,7 +541,10 @@ class Sys_NL:
             v = x[self.ndof:]
             v = v[dof].reshape((len(dof), 1))
 
-        kinetic_energy = 1 / 2 * np.sum(v * (self.M[np.ix_(dof, dof)] @ v), 0)
+        if separate_dof:
+            kinetic_energy = 1 / 2 * v * (self.M[np.ix_(dof, dof)] @ v)
+        else:
+            kinetic_energy = 1 / 2 * np.sum(v * (self.M[np.ix_(dof, dof)] @ v), 0)
 
         return kinetic_energy
 
