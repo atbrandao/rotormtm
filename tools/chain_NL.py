@@ -11,7 +11,7 @@ k = 8e4/d
 cp = 0.0002
 m = mass/N
 
-m_res = m/2
+m_res = m / 2
 
 x0 = d/2
 w_res = 250
