@@ -433,6 +433,17 @@ class Sys_NL:
 
         return np.reshape(x + dt / 6 * (k1 + 2 * k2 + 2 * k3 + k4), (len(x), 1))
 
+    def export_sys_data(self, filename='data.dat', **kwargs):
+
+        with open(filename, 'w') as f:
+            f.write('### Custom parameters ###')
+            f.write(f'{len(kwargs)}\t#Number of custom parameters\n')
+            f.writelines([f'{kwargs[k]:.5f}\t#{k}\n' for k in kwargs])
+            f.write('### System parameters ###')
+            f.write(f'{self.ndof}\t#ndof\n')
+            f.write(f'{self.alpha:.6f}\t#alpha\n')
+            f.write(f'{self.beta:.6f}\t#beta\n')
+
     def solve_transient(self, f, t, omg, x0, probe_dof=None, last_x=False,
                         plot_orbit=False, dt=None, orbit3d=False):
 
