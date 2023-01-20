@@ -424,13 +424,17 @@ class Sys_NL:
         aux3 = np.zeros((len(B), 1)).astype(type(B[0, 0]))
         aux3[:, 0] = B[:, 2]
 
-        k1 = A @ x + aux1 + Minv @ (beta * Snl_stsp @ x + alpha * (Snl_stsp @ x) ** 3)
+        v_aux = Snl_stsp @ x
+        k1 = A @ x + aux1 + Minv @ (beta * v_aux + alpha * v_aux ** 3)
         x1 = x + k1 * dt / 2
-        k2 = A @ x1 + aux2 + Minv @ (beta * Snl_stsp @ x1 + alpha * (Snl_stsp @ x1) ** 3)
+        v_aux = Snl_stsp @ x1
+        k2 = A @ x1 + aux2 + Minv @ (beta * v_aux + alpha * v_aux ** 3)
         x2 = x + k2 * dt / 2
-        k3 = A @ x2 + aux2 + Minv @ (beta * Snl_stsp @ x2 + alpha * (Snl_stsp @ x2) ** 3)
+        v_aux = Snl_stsp @ x2
+        k3 = A @ x2 + aux2 + Minv @ (beta * v_aux + alpha * v_aux ** 3)
         x3 = x + k3 * dt
-        k4 = A @ x3 + aux3 + Minv @ (beta * Snl_stsp @ x3 + alpha * (Snl_stsp @ x3) ** 3)
+        v_aux = Snl_stsp @ x3
+        k4 = A @ x3 + aux3 + Minv @ (beta * v_aux + alpha * v_aux ** 3)
 
         return np.reshape(x + dt / 6 * (k1 + 2 * k2 + 2 * k3 + k4), (len(x), 1))
 
@@ -465,7 +469,8 @@ class Sys_NL:
             f.writelines([f'{self.Snl.flatten()[i]:.6f}\t' for i in range(self.ndof ** 2)])
 
     def solve_transient(self, f, t, omg, x0, probe_dof=None, last_x=False,
-                        plot_orbit=False, dt=None, orbit3d=False, run_fortran=False):
+                        plot_orbit=False, dt=None, orbit3d=False, run_fortran=False,
+                        keep_data=False):
 
         if probe_dof is None:
             probe_dof = [i for i in range(len(x0))]
@@ -482,6 +487,7 @@ class Sys_NL:
             self.export_sys_data(f=f,
                                  dt=t[1] - t[0],
                                  tf=t[-1],
+                                 N=len(t),
                                  omg=omg,
                                  ndof=self.ndof,
                                  x0=x0,
@@ -491,7 +497,8 @@ class Sys_NL:
 
             process = subprocess.Popen('rk4_fortran', shell=True, stdout=subprocess.PIPE)
             process.wait()
-            os.remove('data.dat')
+            if not keep_data:
+                os.remove('data.dat')
             df = pd.read_csv('saida.txt', names=probe_dof, delim_whitespace=True)
             for i, p in enumerate(probe_dof):
                 x_out[i, :] = df[p]
