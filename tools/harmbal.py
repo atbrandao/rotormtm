@@ -495,8 +495,10 @@ class Sys_NL:
                                  probe_dof=probe_dof,
                                  )
 
-            process = subprocess.Popen('rk4_fortran', shell=True, stdout=subprocess.PIPE)
+            process = subprocess.Popen('rk4_fortran')
+
             process.wait()
+
             if not keep_data:
                 os.remove('data.dat')
             df = pd.read_csv('saida.txt', names=probe_dof, delim_whitespace=True)

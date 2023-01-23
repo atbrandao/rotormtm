@@ -2,7 +2,7 @@ import harmbal as hb
 import numpy as np
 from pickle import load
 
-N = 20
+N = 50
 mass = 100
 L = 1
 
@@ -54,16 +54,17 @@ sys = hb.Sys_NL(M=M, K=K, Snl=Snl, beta=-beta, alpha=alpha, n_harm=10, nu=1)
 
 sys.export_sys_data(p1={0:9+1.j, 1:8+2.j}, p2=64123782192678.2222)
 
-
+import datetime
 f = {0: 1e3}
 omg = 100
-
+t0 = datetime.datetime.now()
 x_hb, res = sys.solve_hb(f=f, omg=omg, full_output=True, state_space=True)
+print(datetime.datetime.now() - t0)
 z = res[0]
-fm = sys.floquet_multipliers(omg, z, dt_refine=250)
-print(np.max(np.abs(fm)) > 1)
+# fm = sys.floquet_multipliers(omg, z, dt_refine=250)
+# print(np.max(np.abs(fm)) > 1)
 
-import datetime
+
 
 t0 = datetime.datetime.now()
 
@@ -75,5 +76,7 @@ t0 = datetime.datetime.now()
 x_rk4 = sys.solve_transient(f=f, omg=omg, t=t_rk, x0=x0, run_fortran=True, keep_data=True)
 print(datetime.datetime.now() - t0)
 t0 = datetime.datetime.now()
-x_rk4 = sys.solve_transient(f=f, omg=omg, t=t_rk, x0=x0)
+x_rk42 = sys.solve_transient(f=f, omg=omg, t=t_rk, x0=x0)
 print(datetime.datetime.now() - t0)
+
+print()
