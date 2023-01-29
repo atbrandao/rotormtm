@@ -448,20 +448,20 @@ class Sys_NL:
                     f.write(f'{len(kwargs[k])}\t# Number of excitation points\n')
                     for i, k2 in enumerate(kwargs[k]):
                         f.write(f'{k2}\t')
-                        f.write(f'{np.real(kwargs[k][k2]):.6f}\t')
-                        f.write(f'{np.imag(kwargs[k][k2]):.6f}\t# Excitation #{i+1}\n')
+                        f.write(f'{np.real(kwargs[k][k2]):.20f}\t')
+                        f.write(f'{np.imag(kwargs[k][k2]):.20f}\t# Excitation #{i+1}\n')
                 elif isinstance(kwargs[k], np.ndarray):
-                    f.writelines([f'{kwargs[k].flatten()[i]:.6f}\t' for i in range(len(kwargs[k]))])
+                    f.writelines([f'{kwargs[k].flatten()[i]:.20f}\t' for i in range(len(kwargs[k]))])
                     f.write('\n')
                 elif isinstance(kwargs[k], list):
-                    f.writelines([f'{kwargs[k][i]:.6f}\t' for i in range(len(kwargs[k]))])
+                    f.writelines([f'{kwargs[k][i]:.20f}\t' for i in range(len(kwargs[k]))])
                     f.write('\n')
                 else:
-                    f.write(f'{kwargs[k]:.6f}\t#{k}\n')
+                    f.write(f'{kwargs[k]:.20f}\t#{k}\n')
             f.write('### System parameters ###\n')
             f.write(f'{self.ndof}\t#ndof\n')
-            f.write(f'{self.alpha:.6f}\t#alpha\n')
-            f.write(f'{self.beta:.6f}\t#beta\n')
+            f.write(f'{self.alpha:.20f}\t#alpha\n')
+            f.write(f'{self.beta:.20f}\t#beta\n')
             f.writelines([f'{self.A.flatten()[i]:.6f}\t' for i in range((2 * self.ndof)**2)])
             f.write('\n')
             f.writelines([f'{self.Minv.flatten()[i]:.6f}\t' for i in range((2 * self.ndof) ** 2)])
@@ -469,8 +469,8 @@ class Sys_NL:
             f.writelines([f'{self.Snl.flatten()[i]:.6f}\t' for i in range(self.ndof ** 2)])
 
     def solve_transient(self, f, t, omg, x0, probe_dof=None, last_x=False,
-                        plot_orbit=False, dt=None, orbit3d=False, run_fortran=False,
-                        keep_data=False):
+                        plot_orbit=False, dt=None, orbit3d=False, method='RK4 direct',
+                        keep_data=False, silent=False):
 
         if probe_dof is None:
             probe_dof = [i for i in range(len(x0))]
@@ -482,7 +482,7 @@ class Sys_NL:
         x_out = np.zeros((len(probe_dof), len(t)))
         x_out[:,0] = x0[probe_dof,0]
 
-        if run_fortran:
+        if method='fortran':
 
             self.export_sys_data(f=f,
                                  dt=t[1] - t[0],
@@ -505,6 +505,7 @@ class Sys_NL:
             for i, p in enumerate(probe_dof):
                 x_out[i, :] = df[p]
 
+
         else:
 
             for i in range(1, len(t)):
@@ -522,7 +523,7 @@ class Sys_NL:
 
                 x[:,1] = self.RK4_NL(B_aux,x[:,0],dt)[:,0]
 
-                if np.round(10*i/len(t)) > np.round(10*(i-1)/len(t)):
+                if np.round(10*i/len(t)) > np.round(10*(i-1)/len(t)) and not silent:
                     print(np.round(100*i/len(t)))
                 x_out[:,i] = x[probe_dof, 1]
                 x[:,0] = x[:, 1]
