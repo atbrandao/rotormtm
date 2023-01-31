@@ -1,4 +1,5 @@
 import numpy as np
+import cupy as cp
 import scipy.linalg as la
 from scipy.optimize import newton, least_squares, fsolve
 import plotly.graph_objects as go
@@ -43,6 +44,9 @@ class Sys_NL:
             self.C = C
         self.K = K
         self.Snl = Snl
+        Z = np.zeros((len(self.K), len(self.K)))
+        self.Snl_stsp = np.vstack([np.hstack([Z, Z]),
+                              np.hstack([-self.Snl, Z])])
         self.beta = beta
         self.alpha = alpha
         self.n_harm = n_harm
@@ -405,24 +409,35 @@ class Sys_NL:
 
         return dt_max
 
-    def RK4_NL(self, B, x, dt):
+    def RK4_NL(self, B, x, dt, cupy=False):
 
-        x = np.reshape(x, (len(x), 1))
+        #x = np.reshape(x, (len(x), 1))
         Z = np.zeros((self.ndof, self.ndof))
 
         A = self.A
         alpha = self.alpha
         beta = self.beta
         Minv = self.Minv
-        Snl_stsp = np.vstack([np.hstack([Z, Z]),
-                              np.hstack([-self.Snl, Z])])
+        Snl_stsp = self.Snl_stsp #np.vstack([np.hstack([Z, Z]),
+                              #np.hstack([-self.Snl, Z])])
 
-        aux1 = np.zeros((len(B), 1)).astype(type(B[0, 0]))
-        aux1[:, 0] = B[:, 0]
-        aux2 = np.zeros((len(B), 1)).astype(type(B[0, 0]))
-        aux2[:, 0] = B[:, 1]
-        aux3 = np.zeros((len(B), 1)).astype(type(B[0, 0]))
-        aux3[:, 0] = B[:, 2]
+        if cupy:
+
+            aux1 = cp.zeros((len(B), 1))
+            aux1[:, 0] = B[:, 0]
+            aux2 = cp.zeros((len(B), 1))
+            aux2[:, 0] = B[:, 1]
+            aux3 = cp.zeros((len(B), 1))
+            aux3[:, 0] = B[:, 2]
+        else:
+            aux1 = np.zeros((len(B), 1)).astype(type(B[0, 0]))
+            aux1[:, 0] = B[:, 0]
+            aux2 = np.zeros((len(B), 1)).astype(type(B[0, 0]))
+            aux2[:, 0] = B[:, 1]
+            aux3 = np.zeros((len(B), 1)).astype(type(B[0, 0]))
+            aux3[:, 0] = B[:, 2]
+
+
 
         v_aux = Snl_stsp @ x
         k1 = A @ x + aux1 + Minv @ (beta * v_aux + alpha * v_aux ** 3)
@@ -436,7 +451,9 @@ class Sys_NL:
         v_aux = Snl_stsp @ x3
         k4 = A @ x3 + aux3 + Minv @ (beta * v_aux + alpha * v_aux ** 3)
 
-        return np.reshape(x + dt / 6 * (k1 + 2 * k2 + 2 * k3 + k4), (len(x), 1))
+        out = x + dt / 6 * (k1 + 2 * k2 + 2 * k3 + k4)
+
+        return out.reshape((len(x), 1))
 
     def export_sys_data(self, filename='data.dat', **kwargs):
 
@@ -470,19 +487,23 @@ class Sys_NL:
 
     def solve_transient(self, f, t, omg, x0, probe_dof=None, last_x=False,
                         plot_orbit=False, dt=None, orbit3d=False, method='RK4 direct',
-                        keep_data=False, silent=False):
+                        keep_data=False, silent=False, cupy=False):
 
         if probe_dof is None:
             probe_dof = [i for i in range(len(x0))]
 
-        x = np.zeros((2*self.ndof, 2))
-        x[:, 0] = x0[:, 0]
+        if cupy:
+            x = cp.zeros((2 * self.ndof, 2))
+            x[:, 0] = cp.array(x0[:, 0])
+        else:
+            x = np.zeros((2*self.ndof, 2))
+            x[:, 0] = x0[:, 0]
         F_aux = np.zeros((2*self.ndof, 3))
 
         x_out = np.zeros((len(probe_dof), len(t)))
         x_out[:,0] = x0[probe_dof,0]
 
-        if method='fortran':
+        if method == 'fortran':
 
             self.export_sys_data(f=f,
                                  dt=t[1] - t[0],
@@ -508,26 +529,45 @@ class Sys_NL:
 
         else:
 
+            if cupy:
+                self.A = cp.array(self.A)
+                self.Minv = cp.array(self.Minv)
+                self.Snl_stsp = cp.array(self.Snl_stsp)
+
             for i in range(1, len(t)):
                 if dt is None:
                     dt = t[i] - t[i-1]
 
-                F = np.zeros((self.ndof, 3))
+                if cupy:
+                    F = cp.zeros((2 * self.ndof, 3))
+                else:
+                    F = np.zeros((2 * self.ndof, 3))
+
                 for n in f:
-                    F[n, 0] = np.real(f[n]) * np.cos(omg * t[i-1]) + np.imag(f[n]) * np.sin(omg * t[i-1])
-                    F[n, 1] = np.real(f[n]) * np.cos(omg * t[i-1]+dt/2) + np.imag(f[n]) * np.sin(omg * t[i-1]+dt/2)
-                    F[n, 2] = np.real(f[n]) * np.cos(omg * t[i-1]+dt) + np.imag(f[n]) * np.sin(omg * t[i-1]+dt)
+                    F[n + self.ndof, 0] = np.real(f[n]) * np.cos(omg * t[i - 1]) + np.imag(f[n]) * np.sin(omg * t[i - 1])
+                    F[n + self.ndof, 1] = np.real(f[n]) * np.cos(omg * t[i - 1] + dt / 2) + np.imag(f[n]) * np.sin(
+                        omg * t[i - 1] + dt / 2)
+                    F[n + self.ndof, 2] = np.real(f[n]) * np.cos(omg * t[i - 1] + dt) + np.imag(f[n]) * np.sin(
+                        omg * t[i - 1] + dt)
 
-                F_aux[len(F):, :] = F
-                B_aux = self.Minv @ F_aux
+                #F_aux[len(F):, :] = F
+                B_aux = self.Minv @ F
 
-                x[:,1] = self.RK4_NL(B_aux,x[:,0],dt)[:,0]
+
+                x[:,1] = self.RK4_NL(B_aux,x[:,0].reshape((self.ndof * 2, 1)),dt,cupy=cupy)[:,0]
 
                 if np.round(10*i/len(t)) > np.round(10*(i-1)/len(t)) and not silent:
                     print(np.round(100*i/len(t)))
-                x_out[:,i] = x[probe_dof, 1]
+                if cupy:
+                    x_out[:,i] = x[probe_dof, 1].get()
+                else:
+                    x_out[:, i] = x[probe_dof, 1]
                 x[:,0] = x[:, 1]
 
+            if cupy:
+                self.A = self.A.get()
+                self.Minv = self.Minv.get()
+                self.Snl_stsp = self.Snl_stsp.get()
         if plot_orbit:
             Ni = int(np.round(2*np.pi/omg / dt))
             if self.full_orbit:
