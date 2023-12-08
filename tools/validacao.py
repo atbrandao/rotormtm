@@ -115,42 +115,82 @@ for f0 in np.arange(0.01, 1, 0.05):
     # fig2.write_image(f'FRF/Cost HB Est - f = {string_f}.pdf'.replace(':','_'))
     fig2.write_image(f'FRF/Cost HB Est - f = {string_f}.png'.replace(':','_'))
     
+omg = 5
+
+sp = 70
+
+fig=go.Figure(data=[go.Scatter(x=q_p,y=h_p,name='Bomba 100% rotação'),
+                    go.Scatter(x=q_p*sp/100,y=h_p*(sp/100)**2,name=f'Bomba {sp}% rotação'),
+                    go.Scatter(x=q,y=p,mode='markers',name='Pontos de operação'),
+                    ])
+fig.update_layout(xaxis=dict(title='Vazão por bomba (m³/h)'),
+                  yaxis=dict(title='Head (m)'),)
+
+q_p = np.linspace(0,1.5*16500/2/24,100)
+h_p = 3600 * 1.3 - 0.3*3600 * (q_p/(16500/2/24))**2
+
+    
     
 # SImulação individual
 
 
-# n_harm = 100
-# nu = 4
-# N = 2 # sinal no tempo terá comprimento 2*N*n_harm
+n_harm = 10
+nu = 2
+N = 50 # sinal no tempo terá comprimento 2*N*n_harm
 
-# S = Sys_NL(M=M,K=K_lin+beta*Snl,Snl=Snl,beta=0,alpha=alpha,
-#            n_harm=n_harm,nu=nu,N=N,cp=cp,C=K_lin*cp)
+S = Sys_NL(M=M,K=K_lin+beta*Snl,Snl=Snl,beta=0,alpha=alpha,
+            n_harm=n_harm,nu=nu,N=N,cp=cp,C=K_lin*cp)
 
-# S.dof_nl = [1]
-# S.x_eq = x_eq
+S.dof_nl = [1]
+S.x_eq = x_eq
 
-# omg=13.65
-# x0 = np.array([[0],[x_eq],[0],[0]])
-# tf = np.round(300/(2*np.pi/omg)) * 2*np.pi/omg
-# dt = 2*np.pi/omg / (np.round(2*np.pi/omg / 0.01))
-# t_rk = np.arange(0,tf + dt/2,dt)
-# z0 = S.z0(omg=omg,f_omg={0:0})
-# fig1,x0 = S.solve_hb(f,omg,z0=z0,plot_orbit=True,method=None,state_space=True)
-# fig2,x_rk = S.solve_transient(f,t_rk,omg,x0[:,0].reshape((4,1)),plot_orbit=True,dt=dt)
+omg = 14.3
+f = {0:0.21}
 
+x0 = np.array([[0],[x_eq],[0],[0]])
+tf = np.round(300/(2*np.pi/omg)) * 2*np.pi/omg
+dt = 2*np.pi/omg / (np.round(2*np.pi/omg / 0.01))
+t_rk = np.arange(0,tf + dt/2,dt)
+z0 = S.z0(omg=omg,f_omg={0:0})
+
+fig1, x0 = S.solve_hb(f,omg,z0=z0,plot_orbit=True,method=None,state_space=True)
+fig2, x_rk = S.solve_transient(f,t_rk,omg,x0[:,0].reshape((4,1)),plot_orbit=True,dt=dt)
+
+Ni = int(2*np.pi/omg / dt)
+Np = int(len(t_rk) / Ni)
+x2 = x_rk[:2,Np//2*Ni:Np//2*Ni+Ni*nu]
+t2 = t_rk[Np//2*Ni:Np//2*Ni+Ni*nu] - t_rk[Np//2*Ni]
+
+x = np.zeros((2*len(S.t(omg)),1))
+x[:,0] = np.append(np.interp(S.t(omg)[:,0],t2,x2[0,:]),
+                    np.interp(S.t(omg)[:,0],t2,x2[1,:]))
+# x[1,:] = np.interp(S.t(omg)[:,0],x_rk[1,:],t_rk)
+z = np.linalg.pinv(S.gamma(omg)) @ x
+
+fig3, x0 = S.solve_hb(f,omg,z0=z,plot_orbit=True,method=None,state_space=True)
+
+z2 = np.ones(z0.shape) *1e-5
+z2[0:2] = z0[0:2]
+fig4, x0 = S.solve_hb(f,omg,z0=z2,plot_orbit=True,method=None,state_space=True)
+    
 # fig2.add_trace(fig1.data[0])
 # fig2.add_trace(fig1.data[1])
 # fig2.add_trace(fig1.data[2])
 # fig2.add_trace(fig1.data[3])    
+fig2.add_trace(fig3.data[0])
+fig2.add_trace(fig3.data[1])
+fig2.add_trace(fig3.data[2])
+fig2.add_trace(fig3.data[3]) 
+fig2.show()
     
-# w=np.arange(len(t_rk[20000:]))*dt
-# N=len(t_rk[20000:])
-# w=np.arange(N//2)*(1/(dt*N))
-# spec=2/N*np.abs(np.fft.fft(x_rk[0,20000:]))
-# f_spec=go.Figure(data=go.Scatter(x=w,y=spec))
-# f_spec.update_layout(xaxis=dict(range=(0,8)))
+w=np.arange(len(t_rk[20000:]))*dt
+N=len(t_rk[20000:])
+w=np.arange(N//2)*(1/(dt*N))
+spec=2/N*np.abs(np.fft.fft(x_rk[0,20000:]))
+f_spec=go.Figure(data=go.Scatter(x=w,y=spec))
+f_spec.update_layout(xaxis=dict(range=(0,8)))
 
-# f_spec.update_yaxes(type='log')
+f_spec.update_yaxes(type='log')
     
     
     

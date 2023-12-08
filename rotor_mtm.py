@@ -7,6 +7,8 @@ import plotly.graph_objects as go
 from tools import harmbal
 
 
+
+
 class RotorMTM:
 
     def __init__(self,rotor,n_pos,dk_r,k0,k1,var=0,var_k=0,p_damp=1e-4,ge=True,exp_var=1):
@@ -43,6 +45,10 @@ class RotorMTM:
         self.N = len(self._rotor.M())
         self.N2 = len(self.rotor_solo.M())
 
+        self.unb = True
+        self.coriolis = True
+        self.cross_inertia= True
+
     def M(self):
 
         N = 4 * self.n_res
@@ -55,7 +61,17 @@ class RotorMTM:
                 f = 1 + (self.var / 2) * (2 * (i // 4) / (self.n_res - 1) - 1) ** self.exp_var
             else:
                 f = 1
-            M_add[i:i + 4, i:i + 4] = self.dk_r[i//4].M() * f
+            M_add[i:i + 4, i:i + 4] = self.dk_r[i // 4].M() * f
+
+            # if self.cross_inertia:
+            #     M[self.N2 + i, self.n_pos[i // 4] * 4] = self.dk_r[i // 4].m * f
+            #     M[self.N2 + i + 1, self.n_pos[i // 4] * 4 + 1] = self.dk_r[i // 4].m * f
+            #
+            #     M[self.n_pos[i // 4] * 4, self.n_pos[i // 4] * 4] += self.dk_r[i // 4].m * f
+            #     M[self.n_pos[i // 4] * 4 + 1, self.n_pos[i // 4] * 4 + 1] += self.dk_r[i // 4].m * f
+            #
+            #     M[self.n_pos[i // 4] * 4, self.N2 + i] += self.dk_r[i // 4].m * f
+            #     M[self.n_pos[i // 4] * 4 + 1, self.N2 + i + 1] += self.dk_r[i // 4].m * f
 
         dof = range(self.N2, N + self.N2)
 
@@ -88,6 +104,7 @@ class RotorMTM:
         N = 4 * self.n_res
 
         K = self._rotor.K(sp)
+        M = self.M()
 
         K_add = np.zeros((2 * N, 2 * N))
         
@@ -106,8 +123,32 @@ class RotorMTM:
                               [0, -self.k0 * f, 0, 0, 0, self.k0 * f, 0, 0],
                               [0, 0, -self.k1 * f, 0, 0, 0, self.k1 * f, 0],
                               [0, 0, 0, -self.k1 * f, 0, 0, 0, self.k1 * f], ])
+
+            # K_aux = self.unb * np.array([
+            #     [0, 0, 0, 0, 0, 0, 0, 0],
+            #     [0, 0, 0, 0, 0, 0, 0, 0],
+            #     [0, 0, self.k1 * f, 0, 0, 0, -self.k1 * f, 0],
+            #     [0, 0, 0, self.k1 * f, 0, 0, 0, -self.k1 * f],
+            #     [0, 0, 0, 0, self.k0, 0, 0, 0],
+            #     [0, 0, 0, 0, 0, self.k0, 0, 0],
+            #     [0, 0, -self.k1 * f, 0, 0, 0, self.k1 * f, 0],
+            #     [0, 0, 0, -self.k1 * f, 0, 0, 0, self.k1 * f]
+            # ])
+            # Resonator Unbalance
+            m_res = M[self.N2 + 4 * i, self.N2 + 4 * i]
+            K_unb = self.unb * np.array([
+                [- sp ** 2 * m_res, 0, 0, 0, sp ** 2 * m_res, 0, 0, 0],
+                [0, - sp ** 2 * m_res, 0, 0, 0, sp ** 2 * m_res, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [sp ** 2 * m_res, 0, 0, 0, - sp ** 2 * m_res, 0, 0, 0],
+                [0, sp ** 2 * m_res, 0, 0, 0, - sp ** 2 * m_res, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0]
+            ])
+
             dof_aux = [4 * i + a for a in range(4)] + [N + 4 * i + a for a in range(4)]
-            K_add[np.ix_(dof_aux, dof_aux)] = K_aux
+            K_add[np.ix_(dof_aux, dof_aux)] = K_aux #+ K_unb
 
         dof = dof + [a for a in range(self.N2, N + self.N2)]
         # print(dof)
@@ -150,8 +191,31 @@ class RotorMTM:
                               [0, -self.k0 * f, 0, 0, 0, self.k0 * f, 0, 0],
                               [0, 0, -self.k1 * f, 0, 0, 0, self.k1 * f, 0],
                               [0, 0, 0, -self.k1 * f, 0, 0, 0, self.k1 * f], ])
+
+            # K_aux = self.unb * np.array([
+            #     [0, 0, 0, 0, 0, 0, 0, 0],
+            #     [0, 0, 0, 0, 0, 0, 0, 0],
+            #     [0, 0, self.k1 * f, 0, 0, 0, -self.k1 * f, 0],
+            #     [0, 0, 0, self.k1 * f, 0, 0, 0, -self.k1 * f],
+            #     [0, 0, 0, 0, self.k0, 0, 0, 0],
+            #     [0, 0, 0, 0, 0, self.k0, 0, 0],
+            #     [0, 0, -self.k1 * f, 0, 0, 0, self.k1 * f, 0],
+            #     [0, 0, 0, -self.k1 * f, 0, 0, 0, self.k1 * f]
+            # ])
+
+            # Coriolis forces
+            # C_coriolis = self.coriolis * np.array([
+            #     [0, 0, 0, 0, 0, - 2 * sp * self.dk_r[i].m, 0, 0],
+            #     [0, 0, 0, 0, 2 * sp * self.dk_r[i].m, 0, 0, 0],
+            #     [0, 0, 0, 0, 0, 0, 0, 0],
+            #     [0, 0, 0, 0, 0, 0, 0, 0],
+            #     [0, 0, 0, 0, 0, - 2 * sp * self.dk_r[i].m, 0, 0],
+            #     [0, 0, 0, 0, 2 * sp * self.dk_r[i].m, 0, 0, 0],
+            #     [0, 0, 0, 0, 0, 0, 0, 0],
+            #     [0, 0, 0, 0, 0, 0, 0, 0],
+            # ])
             dof_aux = [4 * i + a for a in range(4)] + [N + 4 * i + a for a in range(4)]
-            C_add[np.ix_(dof_aux, dof_aux)] = self.p_damp * K_aux
+            C_add[np.ix_(dof_aux, dof_aux)] = self.p_damp * K_aux # + C_coriolis
 
         dof = dof + [a for a in range(self.N2, N + self.N2)]
         # print(dof)
@@ -286,13 +350,14 @@ class RotorMTM:
         return y[:N], y_b[:N]
 
     def run_analysis(self, sp_arr, n_modes=50, dof=0, dof_show=0, diff_lim=5,unb_node=0,probe_node=None,
-                     heatmap=False, diff_analysis=False, cross_prod=False, energy=False):
+                     heatmap=False, diff_analysis=False, cross_prod=False, energy=False, silent=False):
 
         prog_bar_width = 40
         i_prog = 0
-        sys.stdout.write("[%s]" % (" " * prog_bar_width))
-        sys.stdout.flush()
-        sys.stdout.write("\b" * (prog_bar_width+1)) 
+        if not silent:
+            sys.stdout.write("[%s]" % (" " * prog_bar_width))
+            sys.stdout.flush()
+            sys.stdout.write("\b" * (prog_bar_width+1))
 
         if probe_node is None:
             probe_node = self.N2//4 - 1
@@ -329,6 +394,7 @@ class RotorMTM:
             r_b = []
             r_diff = []
             r_diff_b = []
+            print(f)
 
             for i, sp in enumerate(sp_arr):
 
@@ -337,12 +403,11 @@ class RotorMTM:
                 else:
                     f0 = f
                 
-                Hs, Ms_inv = self.calc_H(sp,f0,rotor_solo=True)
+                Hs, Ms_inv = self.calc_H(sp, f0, rotor_solo=True)
                 # As = self.rotor_solo_disks.A(sp)
 
                 H, M_inv = self.calc_H(sp,f0)
                 # A = self.A(sp)
-
 
                 Fs = np.zeros((2 * N2, 1)).astype(complex)
                 Fs[N2 + 4 * unb_node] = 1
@@ -402,12 +467,11 @@ class RotorMTM:
 
                 if not heatmap:
                     
-                    if prog_bar_width * sp/max(sp_arr) > i_prog:
+                    if not silent and prog_bar_width * sp/max(sp_arr) > i_prog:
                         sys.stdout.write("-")
                         sys.stdout.flush()
                         i_prog += 1
-                    
-                   
+
 
             if heatmap:
                 rsolo_map.append(rsolo)
@@ -416,7 +480,7 @@ class RotorMTM:
                 r_b_map.append(r_b)
                 diff_map.append(r_diff)
                 diff_map_b.append(r_diff_b)
-                if prog_bar_width * f/max(sp_arr) > i_prog:
+                if not silent and prog_bar_width * f/max(sp_arr) > i_prog:
                     sys.stdout.write("-")
                     sys.stdout.flush()
                     i_prog += 1
@@ -484,7 +548,7 @@ class RotorMTM:
             K_lin += self.k1 * self.K(sp, connectivity_matrix=1)
 
         Sys = harmbal.Sys_NL(M=M, K=K_lin, Snl=Snl, beta=0, alpha=alpha,
-                             n_harm=n_harm, nu=nu, N=N, C=C)
+                             n_harm=n_harm, nu=nu, N=N, C=C, rotor=self)
 
         Sys.dof_nl = [i for i in range(self.N2, len(Snl)) if Snl[i, i] != 0]
         Sys.x_eq = x_eq
@@ -964,3 +1028,5 @@ def scat_iso_2d(x,y,z,mode,name=None,showlegend=True,legendgroup=None,line=None,
                       legendgroup=legendgroup, line=line, marker=marker)
 
     return scat
+
+

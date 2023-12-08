@@ -1,5 +1,5 @@
 import numpy as np
-import scipy.linalg as la
+import numpy.linalg as la
 from scipy.optimize import newton, least_squares, fsolve
 import plotly.graph_objects as go
 import time
@@ -31,12 +31,13 @@ def poincare_section(x, t, omg, n_points=10):
 
 class Sys_NL:
 
-
-
-    def __init__(self,M,K,Snl,beta,alpha,n_harm=10,nu=1,N=2,cp=1e-4,C=None):
+    def __init__(self,
+                 M,K,Snl,beta,alpha,
+                 n_harm=10,nu=1,N=2,cp=1e-4,C=None,rotor=None):
 
         self.M = M
         self.cp = cp
+
         if C is None:
             self.C = K * cp
         else:
@@ -77,8 +78,9 @@ class Sys_NL:
              np.hstack([la.solve(-self.M, self.K), la.solve(-self.M, self.C)])])
         self.full_orbit = False
 
+        self.rotor = rotor
 
-    def H(self,omg):
+    def H(self, omg):
 
         M = self.M
         A = self.A_lin
@@ -89,10 +91,11 @@ class Sys_NL:
 
         return H
 
-    def A_hb(self,omg):
+    def A_hb(self,
+             omg):
 
         Z = np.zeros(self.K.shape)
-        Z2 = np.vstack([Z,Z])
+        Z2 = np.vstack([Z, Z])
 
         A_out = np.vstack([np.hstack([self.K]+[Z]*(2*self.n_harm))] + \
                           [np.hstack([Z2]*(1+2*i)+[np.vstack([np.hstack([self.K-((i+1)*(omg/self.nu))**2*self.M, -(i+1)*omg/self.nu*self.C]),
@@ -448,41 +451,44 @@ class Sys_NL:
                     f.write(f'{len(kwargs[k])}\t# Number of excitation points\n')
                     for i, k2 in enumerate(kwargs[k]):
                         f.write(f'{k2}\t')
-                        f.write(f'{np.real(kwargs[k][k2]):.20f}\t')
-                        f.write(f'{np.imag(kwargs[k][k2]):.20f}\t# Excitation #{i+1}\n')
+                        f.write(f'{np.real(kwargs[k][k2]):.6f}\t')
+                        f.write(f'{np.imag(kwargs[k][k2]):.6f}\t# Excitation #{i+1}\n')
                 elif isinstance(kwargs[k], np.ndarray):
-                    f.writelines([f'{kwargs[k].flatten()[i]:.20f}\t' for i in range(len(kwargs[k]))])
+                    f.writelines([f'{kwargs[k].flatten()[i]:.6f}\t' for i in range(len(kwargs[k]))])
                     f.write('\n')
                 elif isinstance(kwargs[k], list):
-                    f.writelines([f'{kwargs[k][i]:.20f}\t' for i in range(len(kwargs[k]))])
+                    f.writelines([f'{kwargs[k][i]:.6f}\t' for i in range(len(kwargs[k]))])
                     f.write('\n')
                 else:
-                    f.write(f'{kwargs[k]:.20f}\t#{k}\n')
+                    f.write(f'{kwargs[k]:.6f}\t#{k}\n')
             f.write('### System parameters ###\n')
             f.write(f'{self.ndof}\t#ndof\n')
-            f.write(f'{self.alpha:.20f}\t#alpha\n')
-            f.write(f'{self.beta:.20f}\t#beta\n')
+            f.write(f'{self.alpha:.6f}\t#alpha\n')
+            f.write(f'{self.beta:.6f}\t#beta\n')
             f.writelines([f'{self.A.flatten()[i]:.6f}\t' for i in range((2 * self.ndof)**2)])
             f.write('\n')
             f.writelines([f'{self.Minv.flatten()[i]:.6f}\t' for i in range((2 * self.ndof) ** 2)])
             f.write('\n')
             f.writelines([f'{self.Snl.flatten()[i]:.6f}\t' for i in range(self.ndof ** 2)])
 
-    def solve_transient(self, f, t, omg, x0, probe_dof=None, last_x=False,
-                        plot_orbit=False, dt=None, orbit3d=False, method='RK4 direct',
-                        keep_data=False, silent=False):
+    def solve_transient(self, f, t, omg, x0, t_out=None, probe_dof=None, last_x=False,
+                        plot_orbit=False, dt=None, orbit3d=False, run_fortran=False,
+                        keep_data=False, ):
 
         if probe_dof is None:
             probe_dof = [i for i in range(len(x0))]
 
-        x = np.zeros((2*self.ndof, 2))
+        if t_out is None:
+            t_out = t
+
+        x = np.zeros((2 * self.ndof, 2))
         x[:, 0] = x0[:, 0]
-        F_aux = np.zeros((2*self.ndof, 3))
+        F_aux = np.zeros((2 * self.ndof, 3))
 
-        x_out = np.zeros((len(probe_dof), len(t)))
-        x_out[:,0] = x0[probe_dof,0]
+        x_out = np.zeros((len(probe_dof), len(t_out)))
+        x_out[:,0] = x0[probe_dof, 0]
 
-        if method='fortran':
+        if run_fortran:
 
             self.export_sys_data(f=f,
                                  dt=t[1] - t[0],
@@ -495,19 +501,16 @@ class Sys_NL:
                                  probe_dof=probe_dof,
                                  )
 
-            process = subprocess.Popen('rk4_fortran')
-
+            process = subprocess.Popen('rk4_fortran', shell=True, stdout=subprocess.PIPE)
             process.wait()
-
             if not keep_data:
                 os.remove('data.dat')
             df = pd.read_csv('saida.txt', names=probe_dof, delim_whitespace=True)
             for i, p in enumerate(probe_dof):
                 x_out[i, :] = df[p]
 
-
         else:
-
+            j = 1
             for i in range(1, len(t)):
                 if dt is None:
                     dt = t[i] - t[i-1]
@@ -523,9 +526,14 @@ class Sys_NL:
 
                 x[:,1] = self.RK4_NL(B_aux,x[:,0],dt)[:,0]
 
-                if np.round(10*i/len(t)) > np.round(10*(i-1)/len(t)) and not silent:
+                if np.round(10*i/len(t)) > np.round(10*(i-1)/len(t)):
                     print(np.round(100*i/len(t)))
-                x_out[:,i] = x[probe_dof, 1]
+                if j < len(t_out) and t[i] == t_out[j]:
+                    x_out[:, j] = x[probe_dof, 1]
+                    j += 1
+                elif j < len(t_out) and t[i] > t_out[j]:
+                    x_out[:, j] = x[probe_dof, 0] + (x[probe_dof, 1] - x[probe_dof, 0]) * (t[i] - t_out[j]) / (t[i] - t[i-1])
+
                 x[:,0] = x[:, 1]
 
         if plot_orbit:
@@ -757,16 +765,18 @@ class Sys_NL:
 
         return energy_flow
 
-    def plot_frf(self, omg_range, f, tf=300, dt_base=0.01, rms_rk=None,
+    def plot_frf(self, omg_range, f, tf=300, dt_base=None, rms_rk=None,
                  continuation=True, method=None, probe_dof=None, dt_refine=None,
                  stability_analysis=True, save_rms_rk=None, save_rms_hb=None,
-                 energy_analysis=False):
+                 energy_analysis=False, run_hb=True):
 
         rms_hb = np.zeros((1+2*self.ndof, len(omg_range)))
         fm_flag = np.zeros(len(omg_range))
         pc = []
         cost_hb = []
-        cost_hb = []
+
+        if dt_base is None:
+            dt_base = self.dt_max()
 
         if probe_dof is None:
             probe_dof = [i for i in range(self.ndof)]
@@ -784,62 +794,64 @@ class Sys_NL:
         z0 = self.z0(omg=omg_range[0], f_omg={0: 0})  # None
         x0 = np.vstack([z0[:self.ndof].reshape((self.ndof, 1)),
                         0 * z0[:self.ndof].reshape((self.ndof, 1))])
+        thb = 0
 
         for i, omg in enumerate(omg_range):
             t0 = time.time()
 
             # Harmonic Balance
             z0 = self.z0(omg=omg_range[0], f_omg={0: 0})  # None
-            try:
-                x_hb, res = self.solve_hb(f, omg, z0=z0, full_output=True, method=method, state_space=True)  # 'ls')
-            except:
-                x_hb, res = self.solve_hb(f, omg, z0=z0, full_output=True, method='ls', state_space=True)  # 'ls')
-            thb = time.time()
-            try:
-                z = res.x
-            except:
-                z = res[0]
+            if run_hb:
+                try:
+                    x_hb, res = self.solve_hb(f, omg, z0=z0, full_output=True, method=method, state_space=True)  # 'ls')
+                except:
+                    x_hb, res = self.solve_hb(f, omg, z0=z0, full_output=True, method='ls', state_space=True)  # 'ls')
+                thb = time.time()
+                try:
+                    z = res.x
+                except:
+                    z = res[0]
 
-            print(f'Harmonic Balance took {(thb - t0):.1f} seconds to run.')
-            
+                print(f'Harmonic Balance took {(thb - t0):.1f} seconds to run.')
 
-            try:
-                cost_hb.append(res.cost)
-                z0 = res.x
-            except:
-                cost_hb.append(np.linalg.norm(res[1]['fvec']))
-                z0 = res[0]
 
-            rms_hb[:-1, i] = np.array(
-                [np.sqrt(np.sum((x_hb[i, :] - np.mean(x_hb[i, :])) ** 2) / (len(self.t(omg)) - 1)) for i in
-                 range(x_hb.shape[0])])
+                try:
+                    cost_hb.append(res.cost)
+                    z0 = res.x
+                except:
+                    cost_hb.append(np.linalg.norm(res[1]['fvec']))
+                    z0 = res[0]
 
-            try:
-                if res[-2] != 1:
-                    print(res[-1])
-                    rms_hb[-1, i] = 1
-                else:
-                    if stability_analysis:
-                        fm = self.floquet_multipliers(omg, z, dt_refine=dt_refine)
-                        tfm = time.time()
-                        print(f'Floquet Multipliers calculation took {(tfm - thb):.1f} seconds to run.')
-                        if np.max(np.abs(fm)) > 1:
-                            fm_flag[i] = 1
+                rms_hb[:-1, i] = np.array(
+                    [np.sqrt(np.sum((x_hb[i, :] - np.mean(x_hb[i, :])) ** 2) / (len(self.t(omg)) - 1)) for i in
+                     range(x_hb.shape[0])])
+
+                try:
+                    if res[-2] != 1:
+                        print(res[-1])
+                        rms_hb[-1, i] = 1
                     else:
-                        fm_flag[i] = 0
-            except:
-                if not res.success:
-                    print(res.message)
-                    rms_hb[-1, i] = 1
-                else:
-                    if stability_analysis:
-                        fm = self.floquet_multipliers(omg, z, dt_refine=dt_refine)
-                        tfm = time.time()
-                        print(f'Floquet Multipliers calculation took {(tfm - thb):.1f} seconds to run.')
-                        if np.max(np.abs(fm)) > 1:
-                            fm_flag[i] = 1
+                        if stability_analysis:
+                            fm = self.floquet_multipliers(omg, z, dt_refine=dt_refine)
+                            tfm = time.time()
+                            print(f'Floquet Multipliers calculation took {(tfm - thb):.1f} seconds to run.')
+                            if np.max(np.abs(fm)) > 1:
+                                fm_flag[i] = 1
+                        else:
+                            fm_flag[i] = 0
+                except:
+                    if not res.success:
+                        print(res.message)
+                        rms_hb[-1, i] = 1
                     else:
-                        fm_flag[i] = 0
+                        if stability_analysis:
+                            fm = self.floquet_multipliers(omg, z, dt_refine=dt_refine)
+                            tfm = time.time()
+                            print(f'Floquet Multipliers calculation took {(tfm - thb):.1f} seconds to run.')
+                            if np.max(np.abs(fm)) > 1:
+                                fm_flag[i] = 1
+                        else:
+                            fm_flag[i] = 0
 
             # Runge-Kutta 4th order
 
@@ -855,7 +867,10 @@ class Sys_NL:
                 x0 = x_hb[:, 0]
             t1 = time.time()
             if calc:
-                x_rk, x0 = self.solve_transient(f, t_rk, omg, x0.reshape((self.ndof*2, 1)), last_x=True, dt=dt)
+                x_rk, x0 = self.solve_transient(f, t_rk, omg, x0.reshape((self.ndof*2, 1)),
+                                                last_x=True,
+                                                dt=dt,
+                                                probe_dof=probe_dof,)
 
             print(
                 f'RK4 took {(time.time() - t1):.1f} seconds to run: {(time.time() - t1) / (thb - t0):.1f} times longer.')
@@ -882,7 +897,7 @@ class Sys_NL:
         sl = [False] * (np.max(probe_dof) + 1)
         sl[probe_dof[0]] = True
         fig = go.Figure(data=[go.Scatter(x=omg_range, y=rms_hb[i, :], name=f'DoF {i}- HBM') for i in probe_dof] + \
-                             [go.Scatter(x=omg_range, y=rms_rk[i, :], name=f'DoF {i} - RK4') for i in probe_dof] + \
+                             [go.Scatter(x=omg_range, y=rms_rk[i, :], name=f'DoF {i} - RK4') for i in range(x_rk.shape[0])] + \
                              [go.Scatter(x=[omg_range[i] for i in range(len(omg_range)) if rms_hb[-1, i] == 1],
                                          y=[rms_hb[j, i] for i in range(len(omg_range)) if rms_hb[-1, i] == 1],
                                          name='Flagged', mode='markers', marker=dict(color='black'),
@@ -936,6 +951,194 @@ class Sys_NL:
 
         return fig, fig_cost
 
+    def update_speed(self, speed):
+
+        aux = self.rotor.p_damp
+        self.rotor.p_damp = self.cp
+        self.C = self.rotor.C(speed) + self.rotor.G() * speed
+        self.rotor.p_damp = aux
+
+        Z = np.zeros((self.ndof, self.ndof))
+        I = np.eye(self.ndof)
+
+        self.A_lin = np.vstack(
+            [np.hstack([Z, I]),
+             np.hstack([la.solve(-self.M, self.K_lin), la.solve(-self.M, self.C)])])
+        self.A = np.vstack(
+            [np.hstack([Z, I]),
+             np.hstack([la.solve(-self.M, self.K), la.solve(-self.M, self.C)])])
+
+    def plot_smart_frf(self, omg_range, f, tf=300, dt_base=None,
+                 continuation=True, method=None, probe_dof=None, dt_refine=None,
+                 stability_analysis=True, save_rms=None, downsampling=1):
+
+        rms = np.zeros((len(probe_dof), len(omg_range)))
+        pc = []
+        cost_hb = []
+
+        if dt_base is None:
+            dt_base = self.dt_max()
+
+        if probe_dof is None:
+            probe_dof = [i for i in range(self.ndof)]
+
+        n_points = 50
+        z0 = self.z0(omg=omg_range[0], f_omg={0: 0})  # None
+        x0 = np.vstack([z0[:self.ndof].reshape((self.ndof, 1)),
+                        0 * z0[:self.ndof].reshape((self.ndof, 1))])
+        thb = 0
+
+        for i, omg in enumerate(omg_range):
+
+            if self.rotor is not None:
+                self.update_speed(speed=omg)
+
+            t0 = time.time()
+
+            # Harmonic Balance
+            z0 = self.z0(omg=omg_range[0], f_omg={0: 0})  # None
+
+            try:
+                x_hb, res = self.solve_hb(f, omg, z0=z0, full_output=True, method=method, state_space=True)  # 'ls')
+            except:
+                x_hb, res = self.solve_hb(f, omg, z0=z0, full_output=True, method='ls', state_space=True)  # 'ls')
+            thb = time.time()
+            try:
+                z = res.x
+            except:
+                z = res[0]
+
+            print(f'Harmonic Balance took {(thb - t0):.1f} seconds to run.')
+
+            try:
+                cost_hb.append(res.cost)
+                z0 = res.x
+            except:
+                cost_hb.append(np.linalg.norm(res[1]['fvec']))
+                z0 = res[0]
+
+            rms[:, i] = np.array(
+                [np.sqrt(np.sum((x_hb[i, :] - np.mean(x_hb[i, :])) ** 2) / (len(self.t(omg)) - 1)) for i in
+                 probe_dof])
+
+            try:
+                if res[-2] != 1:
+                    print(res[-1])
+                    calc = True
+                else:
+                    if stability_analysis:
+                        fm = self.floquet_multipliers(omg, z, dt_refine=dt_refine)
+                        tfm = time.time()
+                        print(f'Floquet Multipliers calculation took {(tfm - thb):.1f} seconds to run.')
+                        if np.max(np.abs(fm)) > 1:
+                            calc = True
+                        else:
+                            calc = False
+                    else:
+                        calc = False
+
+
+            except:
+                if not res.success:
+                    print(res.message)
+                    calc = True
+                else:
+                    if stability_analysis:
+                        fm = self.floquet_multipliers(omg, z, dt_refine=dt_refine)
+                        tfm = time.time()
+                        print(f'Floquet Multipliers calculation took {(tfm - thb):.1f} seconds to run.')
+                        if np.max(np.abs(fm)) > 1:
+                            calc = True
+                        else:
+                            calc = False
+                    else:
+                        calc = False
+
+            # Runge-Kutta 4th order
+
+            n_periods = max([1, np.round(tf / (2 * np.pi / omg))])
+            tf = n_periods * 2 * np.pi / omg
+            dt = 2 * np.pi / omg / (np.round(2 * np.pi / omg / dt_base))
+            t_rk = np.arange(0, tf + dt / 2, dt)
+            t_out = t_rk[::downsampling]
+            if isinstance(continuation, bool):
+                if not continuation:
+                    x0 = np.vstack([z0[:self.ndof].reshape((self.ndof,1)),
+                                    0 * z0[:self.ndof].reshape((self.ndof, 1))])
+            else:
+                x0 = x_hb[:, 0]
+
+            t1 = time.time()
+            if calc:
+                x_rk, x0 = self.solve_transient(f, t_rk, omg,
+                                                t_out=t_out,
+                                                x0=x0.reshape((self.ndof*2, 1)),
+                                                last_x=True,
+                                                dt=dt,
+                                                probe_dof=probe_dof)
+                rms[:, i] = np.array(
+                    [np.sqrt(
+                        np.sum((x_rk[i, int(x_rk.shape[1] / 2):] - np.mean(x_rk[i, int(x_rk.shape[1] / 2):])) ** 2) / (
+                            int(x_rk.shape[1] / 2))) for i in range(x_rk.shape[0])])
+
+                print(
+                    f'RK4 took {(time.time() - t1):.1f} seconds to run: {(time.time() - t1) / (thb - t0):.1f} times longer.')
+
+
+            print(f'Frequency: {omg:.1f} rad/s -> completed.')
+            print('---------')
+
+        self.update_speed(0)
+
+        if save_rms:
+            with open(save_rms, 'wb') as file:
+                dump(rms, file)
+
+
+        fig = go.Figure(data=[go.Scatter(x=omg_range, y=rms[i, :], name=f'DoF {p}') for i, p in enumerate(probe_dof)]
+                             )
+        fig.update_layout(title={'xanchor': 'center',
+                                 'x': 0.4,
+                                 'font': {'family': 'Arial, bold',
+                                          'size': 15},
+                                 },
+                          yaxis={"gridcolor": "rgb(159, 197, 232)",
+                                 "zerolinecolor": "rgb(74, 134, 232)",
+                                 },
+                          xaxis={'range': [0, np.max(omg_range)],
+                                 "gridcolor": "rgb(159, 197, 232)",
+                                 "zerolinecolor": "rgb(74, 134, 232)"},
+                          xaxis_title='Frequency (rad/s)',
+                          yaxis_title='Amplitude',
+                          font=dict(family="Calibri, bold",
+                                    size=18))
+        fig.update_yaxes(type="log")
+        #
+        # fig_cost = go.Figure(data=[go.Scatter(x=omg_range, y=cost_hb, name='Cost HB'),
+        #                        go.Scatter(x=[omg_range[i] for i in range(len(omg_range)) if rms_hb[-1, i] == 1],
+        #                                   y=[cost_hb[i] for i in range(len(omg_range)) if rms_hb[-1, i] == 1],
+        #                                   name='Flagged', mode='markers', marker=dict(color='black'),
+        #                                   legendgroup='flag'),
+        #                        ])
+        # fig_cost.update_layout(title={'xanchor': 'center',
+        #                          'x': 0.4,
+        #                          'font': {'family': 'Arial, bold',
+        #                                   'size': 15},
+        #                          },
+        #                   yaxis={"gridcolor": "rgb(159, 197, 232)",
+        #                          "zerolinecolor": "rgb(74, 134, 232)",
+        #                          },
+        #                   xaxis={'range': [0, np.max(omg_range)],
+        #                          "gridcolor": "rgb(159, 197, 232)",
+        #                          "zerolinecolor": "rgb(74, 134, 232)"},
+        #                   xaxis_title='Frequency (rad/s)',
+        #                   yaxis_title='Cost function norm',
+        #                   font=dict(family="Calibri, bold",
+        #                             size=18))
+        # fig_cost.update_yaxes(type="log")
+
+        return fig#, fig_cost
+
     def eq_linear_system(self):
 
         eq_sys = Sys_NL(self.M, self.K_lin, self.Snl, beta=0, alpha=0, C=self.C)
@@ -988,3 +1191,68 @@ class Sys_NL:
                                      range=v_range))
 
         return fig
+#
+# class RotorNL(SysNL):
+#
+#     def __init__(self,rotor,
+#                  n_harm=10,nu=1,N=2,cp=1e-4,C=None,
+#                  x_eq0=None, x_eq1=None, sp=0, n_harm=10, nu=1, N=1, cp=1e-4):
+#
+#         self.rotor = rotor
+#
+#         self.M = self.rotor.M()
+#         self.cp = cp
+#
+#         # if C is None:
+#         #     self.C = K * cp
+#         # else:
+#         #     self.C = C
+#         # self.K = K
+#
+#         self.Snl = Snl
+#         self.beta = beta
+#         self.alpha = alpha
+#         self.n_harm = n_harm
+#         self.nu = nu
+#         self.N = N
+#         if self.alpha != 0:
+#             self.x_eq = np.sqrt(-self.beta / self.alpha)
+#         else:
+#             self.x_eq = 0
+#         self.ndof = len(self.M)
+#         # self.K_lin = self.K - self.Snl * 2 * self.beta
+#
+#         self.dof_nl = []
+#         self.base_dof = []
+#         for i in range(len(self.Snl)):
+#             if self.Snl[i, i] != 0:
+#                 if self.K(0)[i, i] == 0:
+#                     self.dof_nl.append(i)
+#                 else:
+#                     self.base_dof.append(i)
+#
+#         Z = np.zeros((self.ndof, self.ndof))
+#         I = np.eye(self.ndof)
+#
+#         self.Minv = np.vstack([np.hstack([I, Z]),
+#                                np.hstack([Z, la.inv(M)])])
+#         # self.A_lin = np.vstack(
+#         #     [np.hstack([Z, I]),
+#         #      np.hstack([la.solve(-self.M, self.K_lin), la.solve(-self.M, self.C)])])
+#         # self.A = np.vstack(
+#         #     [np.hstack([Z, I]),
+#         #      np.hstack([la.solve(-self.M, self.K), la.solve(-self.M, self.C)])])
+#         self.full_orbit = False
+#
+#
+#
+#     def C(self, speed):
+#
+#
+#     def K(self, speed):
+#
+#     def K_lin(self, speed):
+#
+#     def A_lin(self, speed):
+#
+#     def A(self, speed):

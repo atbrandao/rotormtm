@@ -21,11 +21,12 @@ for i in i_ls_frf:
 
         r = [np.array([data['rsolo_map'][j,j] for j in range(N)]).reshape(N,1),
              np.array([data['r_map'][j,j] for j in range(N)]).reshape(N,1)]
+
         r_b = [np.array([data['rsolo_b_map'][j, j] for j in range(N)]).reshape(N,1),
              np.array([data['r_b_map'][j, j] for j in range(N)]).reshape(N,1)]
 
     if 'flex' in files[i]:
-        str_sub = 'var3'
+        str_sub = 'var1'
         fname = 'flex'
     else:
         str_sub = 'var1'
@@ -40,9 +41,11 @@ for i in i_ls_frf:
     fig = rmtm.plot_frf(r,sp_arr)
     fig.update_layout(yaxis=dict(range=[-8,-4.5]))
     fig.write_image(f'Forward_excitation_{fname}.pdf')
+    fig.write_html(f'Forward_excitation_{fname}.html')
     fig = rmtm.plot_frf(r_b, sp_arr)
     fig.update_layout(yaxis=dict(range=[-8, -4.5]))
     fig.write_image(f'Backward_excitation_{fname}.pdf')
+    fig.write_html(f'Backward_excitation_{fname}.html')
 
 for i in i_ls:
     with open(files[i],'rb') as f:
