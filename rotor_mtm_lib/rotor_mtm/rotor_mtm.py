@@ -4,10 +4,7 @@ import numpy as np
 from scipy import linalg as la
 import sys
 import plotly.graph_objects as go
-from tools import harmbal
-
-
-
+from .harmbal import Sys_NL
 
 class RotorMTM:
 
@@ -156,14 +153,24 @@ class RotorMTM:
         # todo corrigir considerando var_k
         if connectivity_matrix is not None:
             K = np.zeros(K.shape)
-            if connectivity_matrix == 0:
-                K_add[2::4] = 0
-                K_add[3::4] = 0
-                K_add = K_add / self.k0
-            elif connectivity_matrix == 1:
-                K_add[0::4] = 0
-                K_add[1::4] = 0
-                K_add = K_add / self.k1
+            for i in [0, 1]:
+                if i in connectivity_matrix:
+                    K_add[i::4] = K_add[i::4] / self.k0
+                else:
+                    K_add[i::4] = 0
+            for i in [2, 3]:
+                if i in connectivity_matrix:
+                    K_add[i::4] = K_add[i::4] / self.k1
+                else:
+                    K_add[i::4] = 0
+#            if connectivity_matrix == 0:
+#                K_add[2::4] = 0
+#                K_add[3::4] = 0
+#                K_add = K_add / self.k0
+#            elif connectivity_matrix == 1:
+#                K_add[0::4] = 0
+#                K_add[1::4] = 0
+#                K_add = K_add / self.k1
 
         K[np.ix_(dof, dof)] += K_add
 
@@ -513,7 +520,14 @@ class RotorMTM:
 
         return out
 
-    def create_Sys_NL(self, x_eq0=None, x_eq1=None, sp=0, n_harm=10, nu=1, N=1, cp=1e-4):
+    def create_Sys_NL(self,
+                      x_eq0=(None, None),
+                      x_eq1=(None, None),
+                      sp=0,
+                      n_harm=10,
+                      nu=1,
+                      N=1,
+                      cp=1e-4):
 
         M = self.M()
         beta0 = -self.k0 / 2
@@ -525,29 +539,38 @@ class RotorMTM:
         self.p_damp = aux
 
         Snl = 0 * M #self.K(sp, connectivity_matrix=dof)
-        if x_eq0 is not None:
-            alpha = -beta0 / x_eq0 ** 2
-            Snl += self.K(sp, connectivity_matrix=0)
-            K_lin += beta0 * self.K(sp, connectivity_matrix=0)
-            beta = beta0
-            x_eq = x_eq0
-        else:
-            K_lin += self.k0 * self.K(sp, connectivity_matrix=0)
-            alpha = 0
-            x_eq = 0
+        alpha = 0
+        x_eq = 0
+        for i, x in enumerate(x_eq0):
+            if x is None or x == 0:
+                K_lin += self.k0 * self.K(sp, connectivity_matrix=[i])
+            else:
+                alpha = -beta0 / x ** 2
+                Snl += self.K(sp, connectivity_matrix=[i])
+                K_lin += beta0 * self.K(sp, connectivity_matrix=[i])
+                x_eq = x
 
-        if x_eq1 is not None:
-            alpha1 = -beta1 / x_eq1 ** 2
-            if x_eq0 is None:
-                x_eq = x_eq1
-                alpha = alpha1
-            Snl += self.K(sp, connectivity_matrix=1)# * (alpha1/alpha) ** (1/3)
-            K_lin += beta1 * self.K(sp, connectivity_matrix=1)
-            beta = beta1
-        else:
-            K_lin += self.k1 * self.K(sp, connectivity_matrix=1)
+        for i, x in enumerate(x_eq1):
+            if x is None or x == 0:
+                K_lin += self.k1 * self.K(sp, connectivity_matrix=[i + 2])
+            else:
+                alpha = -beta1 / x ** 2
+                Snl += self.K(sp, connectivity_matrix=[i + 2])
+                K_lin += beta1 * self.K(sp, connectivity_matrix=[i + 2])
+                x_eq = x
 
-        Sys = harmbal.Sys_NL(M=M, K=K_lin, Snl=Snl, beta=0, alpha=alpha,
+#        if x_eq1 is not None:
+#            alpha1 = -beta1 / x_eq1 ** 2
+#            if x_eq0 is None:
+#                x_eq = x_eq1
+#                alpha = alpha1
+#            Snl += self.K(sp, connectivity_matrix=1)# * (alpha1/alpha) ** (1/3)
+#            K_lin += beta1 * self.K(sp, connectivity_matrix=1)
+#            beta = beta1
+#        else:
+#            K_lin += self.k1 * self.K(sp, connectivity_matrix=[2, 3])
+
+        Sys = Sys_NL(M=M, K=K_lin, Snl=Snl, beta=0, alpha=alpha,
                              n_harm=n_harm, nu=nu, N=N, C=C, rotor=self)
 
         Sys.dof_nl = [i for i in range(self.N2, len(Snl)) if Snl[i, i] != 0]

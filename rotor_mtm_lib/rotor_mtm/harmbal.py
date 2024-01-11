@@ -1,12 +1,13 @@
 import numpy as np
 import numpy.linalg as la
-from scipy.optimize import newton, least_squares, fsolve
+from scipy.optimize import least_squares, fsolve
 import plotly.graph_objects as go
 import time
-from pickle import dump, load
+from pickle import dump
 import subprocess
 import pandas as pd
 import os
+from .results import IntegrationResults
 
 def poincare_section(x, t, omg, n_points=10):
     dt = t[1] - t[0]
@@ -322,15 +323,19 @@ class Sys_NL:
                 root = res
             else:
                 root = res.x
-        x = self.gamma(omg) @ root.reshape((len(root), 1))
-        x = x.reshape(len(x))
-        x = x.reshape((self.ndof,len(x)//self.ndof))#[:,:-1]
-        if state_space:
-            v = self.dgamma_dt(omg) @ root.reshape((len(root), 1))
-            v = v.reshape(len(v))
-            v = v.reshape((self.ndof, len(v) // self.ndof))#[:, :-1]
-            x = np.vstack([x,
-                           v])
+
+        x = self.inv_fourier(root, omg, state_space)
+
+        # x = self.gamma(omg) @ root.reshape((len(root), 1))
+        # x = x.reshape(len(x))
+        # x = x.reshape((self.ndof,len(x)//self.ndof))#[:,:-1]
+        # if state_space:
+        #     v = self.dgamma_dt(omg) @ root.reshape((len(root), 1))
+        #     v = v.reshape(len(v))
+        #     v = v.reshape((self.ndof, len(v) // self.ndof))#[:, :-1]
+        #     x = np.vstack([x,
+        #                    v])
+
         if plot_orbit:
             Ni = int(np.round(x.shape[1] / self.nu))
             fig = self.plot_orbit(x, Ni)
@@ -341,6 +346,51 @@ class Sys_NL:
             else:
                 return x
 
+    def inv_fourier(self, z, omg, state_space=False):
+
+        x = self.gamma(omg) @ z.reshape((len(z), 1))
+        x = x.reshape(len(x))
+        x = x.reshape((self.ndof, len(x) // self.ndof))
+        if state_space:
+            v = self.dgamma_dt(omg) @ z.reshape((len(z), 1))
+            v = v.reshape(len(v))
+            v = v.reshape((self.ndof, len(v) // self.ndof))  # [:, :-1]
+            x = np.vstack([x,
+                           v])
+        return x
+
+    def z_to_x(self, z, t, omg, state_space=False):
+
+        aux = np.append(np.array([1]),
+                        np.hstack([np.array([np.sin(omg * i / self.nu * t),
+                                             np.cos(omg * i / self.nu * t)]) for i in range(1, self.n_harm + 1)]))
+        x = np.zeros((self.ndof, 1))
+        for i in range(self.ndof):
+            x[i] = np.sum(aux * z[i::self.ndof])
+        #
+        # x = self.gamma(omg,
+        #                t=np.array([t])) @ z
+        x = x.reshape(len(x), 1)
+
+        if state_space:
+            aux_v = np.append(np.array([1]),
+                              np.hstack([np.array([omg * i / self.nu * np.cos(omg * i / self.nu * t),
+                                                   - omg * i / self.nu * np.sin(omg * i / self.nu * t)]) for i in
+                                         range(1, self.n_harm + 1)
+                                         ]
+                                        )
+                              )
+            v = np.zeros((self.ndof, 1))
+            for i in range(self.ndof):
+                v[i] = np.sum(aux_v * z[i::self.ndof])
+            # v = self.dgamma_dt(omg,
+            #                    t=np.array([t])) @ z
+            v = v.reshape(len(v), 1)
+            x = np.vstack([x,
+                           v])
+
+        return x
+
     def floquet_multipliers(self, omg, z, dt_refine=None):
 
         M = np.eye(len(self.A))
@@ -348,42 +398,27 @@ class Sys_NL:
         if dt_refine is None:
             dt_refine = np.ceil(self.dt(omg) / self.dt_max())
 
+        t_base = self.t(omg)[:, 0]
+
+        x = self.inv_fourier(z, omg, state_space=True)
+
         N0 = self.N
         self.N = self.N * dt_refine
 
         t = self.t(omg)
         dt = self.dt(omg)
-        t2 = self.t(omg, t0=dt / 2)
-
-        x = self.gamma(omg) @ z
-        v = self.dgamma_dt(omg) @ z
-        x2 = self.gamma(omg, t0=dt / 2) @ z
-        v2 = self.dgamma_dt(omg, t0=dt / 2) @ z
 
         self.N = N0
 
-        x = x.reshape(len(x))
-        x = x.reshape((self.ndof, len(x) // self.ndof))
-        v = v.reshape(len(v))
-        v = v.reshape((self.ndof, len(v) // self.ndof))
-
-        x2 = x2.reshape(len(x2))
-        x2 = x2.reshape((self.ndof, len(x2) // self.ndof))
-        v2 = v2.reshape(len(v2))
-        v2 = v2.reshape((self.ndof, len(v2) // self.ndof))
-
-        x = np.vstack([x,
-                       v])
-        x2 = np.vstack([x2,
-                        v2])
-
         for i, t1 in enumerate(t):
-            x_1 = x[:, i]
-            x_2 = x2[:,i]
-            if i + 1 < len(t):
-                x_3 = x[:, i + 1]
-            else:
-                x_3 = x[:, 0]
+
+            # x_1 = self.z_to_x(z, t1, omg, state_space=True)
+            # x_2 = self.z_to_x(z, t1 + dt / 2, omg, state_space=True)
+            # x_3 = self.z_to_x(z, t1 + dt, omg, state_space=True)
+
+            x_1 = np.array([np.interp(t1, t_base, x[i, :]) for i in range(x.shape[0])]).reshape((x.shape[0], 1))
+            x_2 = np.array([np.interp(t1 + dt / 2, t_base, x[i, :]) for i in range(x.shape[0])]).reshape((x.shape[0], 1))
+            x_3 = np.array([np.interp(t1 + dt, t_base, x[i, :]) for i in range(x.shape[0])]).reshape((x.shape[0], 1))
 
             k1 = self.df_stsp_dx(x_1) @ M
             M1 = M + k1 * dt / 2
@@ -394,6 +429,7 @@ class Sys_NL:
             k4 = self.df_stsp_dx(x_3) @ M3
 
             M += dt / 6 * (k1 + 2 * k2 + 2 * k3 + k4)
+
 
         fm = la.eig(M)[0]
 
@@ -970,7 +1006,8 @@ class Sys_NL:
 
     def plot_smart_frf(self, omg_range, f, tf=300, dt_base=None,
                  continuation=True, method=None, probe_dof=None, dt_refine=None,
-                 stability_analysis=True, save_rms=None, downsampling=1):
+                 stability_analysis=True, save_rms=None, downsampling=1, run_hb=True,
+                       save_raw_data=False, return_results=False, probe_names=None):
 
         rms = np.zeros((len(probe_dof), len(omg_range)))
         pc = []
@@ -979,14 +1016,23 @@ class Sys_NL:
         if dt_base is None:
             dt_base = self.dt_max()
 
+        if probe_names is None:
+            probe_names = [str(a) for a in probe_dof]
+
         if probe_dof is None:
             probe_dof = [i for i in range(self.ndof)]
 
         n_points = 50
         z0 = self.z0(omg=omg_range[0], f_omg={0: 0})  # None
-        x0 = np.vstack([z0[:self.ndof].reshape((self.ndof, 1)),
-                        0 * z0[:self.ndof].reshape((self.ndof, 1))])
+        x0 = self.inv_fourier(z0,
+                              omg_range[0],
+                              state_space=True)[:, 0]
+
+        # x0 = np.vstack([z0[:self.ndof].reshape((self.ndof, 1)),
+        #                 0 * z0[:self.ndof].reshape((self.ndof, 1))])
         thb = 0
+
+        data_dict_list = []
 
         for i, omg in enumerate(omg_range):
 
@@ -994,77 +1040,82 @@ class Sys_NL:
                 self.update_speed(speed=omg)
 
             t0 = time.time()
+            if run_hb:
+                # Harmonic Balance
+                z0 = self.z0(omg=omg_range[0], f_omg={0: 0})  # None
 
-            # Harmonic Balance
-            z0 = self.z0(omg=omg_range[0], f_omg={0: 0})  # None
+                try:
+                    x_hb, res = self.solve_hb(f, omg, z0=z0, full_output=True, method=method, state_space=True)  # 'ls')
+                except:
+                    x_hb, res = self.solve_hb(f, omg, z0=z0, full_output=True, method='ls', state_space=True)  # 'ls')
+                thb = time.time()
+                try:
+                    z = res.x
+                except:
+                    z = res[0]
 
-            try:
-                x_hb, res = self.solve_hb(f, omg, z0=z0, full_output=True, method=method, state_space=True)  # 'ls')
-            except:
-                x_hb, res = self.solve_hb(f, omg, z0=z0, full_output=True, method='ls', state_space=True)  # 'ls')
-            thb = time.time()
-            try:
-                z = res.x
-            except:
-                z = res[0]
+                print(f'Harmonic Balance took {(thb - t0):.1f} seconds to run.')
 
-            print(f'Harmonic Balance took {(thb - t0):.1f} seconds to run.')
+                try:
+                    cost_hb.append(res.cost)
+                    z0 = res.x
+                except:
+                    cost_hb.append(np.linalg.norm(res[1]['fvec']))
+                    z0 = res[0]
 
-            try:
-                cost_hb.append(res.cost)
-                z0 = res.x
-            except:
-                cost_hb.append(np.linalg.norm(res[1]['fvec']))
-                z0 = res[0]
+                rms[:, i] = np.array(
+                    [np.sqrt(np.sum((x_hb[i, :] - np.mean(x_hb[i, :])) ** 2) / (len(self.t(omg)) - 1)) for i in
+                     probe_dof])
 
-            rms[:, i] = np.array(
-                [np.sqrt(np.sum((x_hb[i, :] - np.mean(x_hb[i, :])) ** 2) / (len(self.t(omg)) - 1)) for i in
-                 probe_dof])
-
-            try:
-                if res[-2] != 1:
-                    print(res[-1])
-                    calc = True
-                else:
-                    if stability_analysis:
-                        fm = self.floquet_multipliers(omg, z, dt_refine=dt_refine)
-                        tfm = time.time()
-                        print(f'Floquet Multipliers calculation took {(tfm - thb):.1f} seconds to run.')
-                        if np.max(np.abs(fm)) > 1:
-                            calc = True
+                try:
+                    if res[-2] != 1:
+                        print(res[-1])
+                        calc = True
+                    else:
+                        if stability_analysis:
+                            fm = self.floquet_multipliers(omg, z, dt_refine=dt_refine)
+                            tfm = time.time()
+                            print(f'Floquet Multipliers calculation took {(tfm - thb):.1f} seconds to run.')
+                            if np.max(np.abs(fm)) > 1:
+                                calc = True
+                            else:
+                                calc = False
                         else:
                             calc = False
+
+
+                except:
+                    if not res.success:
+                        print(res.message)
+                        calc = True
                     else:
-                        calc = False
-
-
-            except:
-                if not res.success:
-                    print(res.message)
-                    calc = True
-                else:
-                    if stability_analysis:
-                        fm = self.floquet_multipliers(omg, z, dt_refine=dt_refine)
-                        tfm = time.time()
-                        print(f'Floquet Multipliers calculation took {(tfm - thb):.1f} seconds to run.')
-                        if np.max(np.abs(fm)) > 1:
-                            calc = True
+                        if stability_analysis:
+                            fm = self.floquet_multipliers(omg, z, dt_refine=dt_refine)
+                            tfm = time.time()
+                            print(f'Floquet Multipliers calculation took {(tfm - thb):.1f} seconds to run.')
+                            if np.max(np.abs(fm)) > 1:
+                                calc = True
+                            else:
+                                calc = False
                         else:
                             calc = False
-                    else:
-                        calc = False
+            else:
+                calc = True
 
             # Runge-Kutta 4th order
 
             n_periods = max([1, np.round(tf / (2 * np.pi / omg))])
-            tf = n_periods * 2 * np.pi / omg
+            tf2 = n_periods * 2 * np.pi / omg
             dt = 2 * np.pi / omg / (np.round(2 * np.pi / omg / dt_base))
-            t_rk = np.arange(0, tf + dt / 2, dt)
+            t_rk = np.arange(0, tf2 + dt / 2, dt)
             t_out = t_rk[::downsampling]
             if isinstance(continuation, bool):
                 if not continuation:
-                    x0 = np.vstack([z0[:self.ndof].reshape((self.ndof,1)),
-                                    0 * z0[:self.ndof].reshape((self.ndof, 1))])
+                    x0 = self.inv_fourier(z0,
+                                          omg_range[0],
+                                          state_space=True)[:, 0]
+                    # x0 = np.vstack([z0[:self.ndof].reshape((self.ndof,1)),
+                    #                 0 * z0[:self.ndof].reshape((self.ndof, 1))])
             else:
                 x0 = x_hb[:, 0]
 
@@ -1076,6 +1127,15 @@ class Sys_NL:
                                                 last_x=True,
                                                 dt=dt,
                                                 probe_dof=probe_dof)
+                if save_raw_data:
+                    with open(f'{save_raw_data}data_rk4 f {f} _ omg-{omg}.pic'.replace(':', '_'), 'wb') as file:
+                        dump([x_rk, t_out], file)
+                if return_results:
+                    data_dict_list.append(dict(time=t_out))
+                    for j, p in enumerate(probe_names):
+                        data_dict_list[-1][p] = x_rk[j, :]
+
+
                 rms[:, i] = np.array(
                     [np.sqrt(
                         np.sum((x_rk[i, int(x_rk.shape[1] / 2):] - np.mean(x_rk[i, int(x_rk.shape[1] / 2):])) ** 2) / (
@@ -1083,7 +1143,6 @@ class Sys_NL:
 
                 print(
                     f'RK4 took {(time.time() - t1):.1f} seconds to run: {(time.time() - t1) / (thb - t0):.1f} times longer.')
-
 
             print(f'Frequency: {omg:.1f} rad/s -> completed.')
             print('---------')
@@ -1137,7 +1196,12 @@ class Sys_NL:
         #                             size=18))
         # fig_cost.update_yaxes(type="log")
 
-        return fig#, fig_cost
+        if return_results:
+            return IntegrationResults(data_dict_list=data_dict_list,
+                                      frequency_list=omg_range,
+                                      system=self)
+        else:
+            return fig
 
     def eq_linear_system(self):
 

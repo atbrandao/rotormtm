@@ -1,4 +1,4 @@
-import harmbal as hb
+from rotor_mtm import harmbal as hb
 import numpy as np
 from pickle import load, dump
 import plotly.graph_objects as go

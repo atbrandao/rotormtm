@@ -5,7 +5,7 @@ import numpy as np
 import time
 import pickle
 import plotly.graph_objects as go
-from tools.harmbal import poincare_section as pcs
+from scripts.harmbal import poincare_section as pcs
 from multiprocessing import Pool
 import os
 
