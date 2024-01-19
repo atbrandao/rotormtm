@@ -94,11 +94,38 @@ r = rotor_dict['r_det_transtun']
 
 
 probe_node = r.N2//4 - 1
+
 probe_dof_x = probe_node * 4
 probe_dof_y = probe_node * 4 + 1
 
 probe_res0_x = probe_dof_x + 4
 probe_res0_y = probe_dof_y + 4
+
+probes_last = [probe_dof_x, probe_dof_y]
+probes_res0 = [probe_res0_x, probe_res0_y]
+probes_base0 = [n_pos[0] * 4, n_pos[0] * 4 + 1]
+
+probes_last_name = ['last_x', 'last_y']
+probes_res0_name = ['res0_x', 'res0_y']
+probes_base0_name = ['base0_x', 'base0_y']
+
+probes_res = []
+probes_base = []
+probes_res_name = []
+probes_base_name = []
+for n in range(1, n_res):
+    probes_res.append(probes_res0[0] + 4 * n)
+    probes_res.append(probes_res0[1] + 4 * n)
+    probes_base.append(probes_base0[0] + 4 * n)
+    probes_base.append(probes_base0[1] + 4 * n)
+
+    probes_res_name.append(f'res{n}_x')
+    probes_res_name.append(f'res{n}_y')
+    probes_base_name.append(f'base{n}_x')
+    probes_base_name.append(f'base{n}_y')
+
+
+
 
 sp_arr = np.linspace(1, 800, 200)[9:]
 # sp_arr = np.array([300, 350])
@@ -123,9 +150,7 @@ mult = 1
 #                       n_harm=5)
 #mult = 1
 
-probes = [probe_dof_x, probe_dof_y]
-probes_res0 = [probe_res0_x, probe_res0_y]
-probes_base0 = [n_pos[0] * 4, n_pos[0] * 4 + 1]
+
 
 dt_base = Sys0.dt_max()
 n_periods = max([1, np.round(tf / (2 * np.pi / omg))])
@@ -155,10 +180,10 @@ if plot:
                                             x0=x0.reshape((Sys0.ndof * 2, 1)),
                                             plot_orbit=True,
                                             dt=dt,
-                                            probe_dof=probes + probes_res0)
+                                            probe_dof=probes_last + probes_res0)
 
     fig_wf = go.Figure(data=[go.Scatter(x=t_out,
-                                        y=x_rk[i, :]) for i in range(len(probes+probes_res0))
+                                        y=x_rk[i, :]) for i in range(len(probes_last + probes_res0))
                              ])
     fig_orbit_res0 = go.Figure(data=[go.Scatter(x=x_rk[2, :],
                                                 y=x_rk[3, :])
@@ -173,24 +198,26 @@ if plot:
 # fig = go.Figure(data=[go.Scatter(x=t_rk, y=x_rk[probe_dof_x, :])])
 # fig.write_html(f'Rotor_NL/{tf} s.html')
 
-for f0 in [4]:#[0.1, 1, 2, 3, 4]:
+for f0 in [2, 3, 4]: # [0.1, 1, 2, 3, 4]:
     f = {0: f0 * 100 * mult,
          1: - f0 * 100.j * mult}
 
-    res = Sys0.plot_smart_frf(sp_arr, f,
-                                tf=tf,
-                                stability_analysis=False,
-                                probe_dof=probes + probes_res0 + probes_base0,
-                                downsampling=downsampling,
-                                #save_rms=f'Rotor_NL/rotor_nl_frf_f-{f[0]}.dat',
-                              run_hb=False,
-                              #save_raw_data='Rotor_NL/',
-                              return_results=True,
-                              probe_names=['last_x', 'last_y',
-                                           'res0_x', 'res0_y',
-                                           'base0_x', 'base0_y'])
+    res = Sys0.plot_smart_frf(
+        sp_arr,
+        f,
+        tf=tf,
+        stability_analysis=False,
+        probe_dof=probes_last + probes_res0 + probes_base0 + probes_res + probes_base,
+        downsampling=downsampling,
+        # save_rms=f'Rotor_NL/rotor_nl_frf_f-{f[0]}.dat',
+        run_hb=False,
+        # save_raw_data='Rotor_NL/',
+        return_results=True,
+        probe_names=probes_last_name + probes_res0_name + probes_base0_name + probes_res_name + probes_base_name
+    )
+
     with open(f'results_backward_f{f[0]}.pic', 'wb') as file:
         pickle.dump(res, file)
 
-    pass
+    # pass
     #fig.write_html(f'Rotor_NL/rotor_nl_frf_f-{f[0]}.html')
