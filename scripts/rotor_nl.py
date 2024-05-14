@@ -158,7 +158,7 @@ mult = 1
 
 # Flextun
 r = rotor_dict['r_det_flextun']
-Sys_flex = r.create_Sys_NL(x_eq1=(1 * np.pi / 180, None),
+Sys_flex = r.create_Sys_NL(x_eq1=(2 * 1 * np.pi / 180, None),
                        sp=sp_arr[0],
                        cp=1e-4,
                        n_harm=5)
@@ -213,7 +213,7 @@ if plot:
 # fig.write_html(f'Rotor_NL/{tf} s.html')
 
 for whirl in ['backward', 'forward']:
-    for f0 in [0.1, 3, 5]: #1, 1.5, 2, 2.5, 3, 4, 4.5, 5]:
+    for f0 in [0.1, 2, 3, 5]: #1, 1.5, 2, 2.5, 3, 4, 4.5, 5]:
         if whirl == 'backward':
             f = {0: f0 * 100 * mult,
                  1: - f0 * 100.j * mult}
@@ -221,24 +221,24 @@ for whirl in ['backward', 'forward']:
             f = {0: f0 * 100 * mult,
                  1: f0 * 100.j * mult}
 
-        if whirl == 'forward' or f0 not in [0.1, 1, 2, 3, 4, 4.5]:
+        #if whirl == 'forward' or f0 not in [0.1, 1, 2, 3, 4, 4.5]:
 
-            res = Sys_trans.plot_smart_frf(
-                sp_arr,
-                f,
-                tf=tf,
-                stability_analysis=False,
-                probe_dof=probes_last + probes_res + probes_base,
-                downsampling=downsampling,
-                # save_rms=f'Rotor_NL/rotor_nl_frf_f-{f[0]}.dat',
-                run_hb=False,
-                # save_raw_data='Rotor_NL/',
-                return_results=True,
-                probe_names=probes_last_name + probes_res_name + probes_base_name
-            )
+        res = Sys_trans.plot_smart_frf(
+            sp_arr,
+            f,
+            tf=tf,
+            stability_analysis=False,
+            probe_dof=probes_last + probes_res + probes_base,
+            downsampling=downsampling,
+            # save_rms=f'Rotor_NL/rotor_nl_frf_f-{f[0]}.dat',
+            run_hb=False,
+            # save_raw_data='Rotor_NL/',
+            return_results=True,
+            probe_names=probes_last_name + probes_res_name + probes_base_name
+        )
 
-            with open(f'2x0_results_transtun_{whirl}_f{f[0]}.pic', 'wb') as file:
-                pickle.dump(res, file)
+        with open(f'2x0_results_transtun_{whirl}_f{f[0]}.pic', 'wb') as file:
+            pickle.dump(res, file)
 
         res = Sys_flex.plot_smart_frf(
             sp_arr,
