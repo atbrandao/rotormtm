@@ -97,7 +97,9 @@ class IntegrationResults():
         spectrum = 2 / (np.sum(win)) * np.fft.fft(win * x_cut)
         if not return_complex:
             spectrum = np.abs(spectrum)
+
         spectrum = spectrum[1:]
+        spectrum = spectrum[:len(w)]
 
         return w, spectrum
 
@@ -317,6 +319,7 @@ class IntegrationResults():
                       )
 
         fig = self._adjust_plot(fig)
+
         fig.update_layout(
             xaxis_range=[np.min(self.fl), np.max(self.fl)],
             yaxis_range=[0, max_freq],
@@ -346,6 +349,7 @@ class IntegrationResults():
                                     hanning=hanning,
                                     synch_freq=synch_freq,
                                     return_complex=True)
+
         _, spec_2 = self._calc_fourier(t=t,
                                     x=x[1],
                                     cut=cut,
@@ -375,14 +379,22 @@ class IntegrationResults():
         for i, f in enumerate(self.fl):
             d = self.ddl[i]
 
-            w, aux = self._calc_diff(t=t,
-                                     x=(
-                                         np.interp(t, d['time'], d[dof[0]]),
-                                         np.interp(t, d['time'], d[dof[1]])
-                                     ),
-                                     hanning=hanning,
-                                     cut=cut
-                                     )
+            aux = None
+            for dof_i in dof:
+                w, aux2 = self._calc_diff(t=t,
+                                         x=(
+                                             np.interp(t, d['time'], d[dof_i[0]]),
+                                             np.interp(t, d['time'], d[dof_i[1]])
+                                         ),
+                                         hanning=hanning,
+                                         cut=cut
+                                         )
+                if aux is None:
+                    aux = aux2
+                else:
+                    aux = (aux + aux2) / 2
+
+
             if z is None:
                 z = np.zeros((len(self.fl), len(aux))).astype(complex)
 
@@ -391,11 +403,13 @@ class IntegrationResults():
         if mode == 'amp':
             z = np.log10(np.abs(z))
             colorbar = dict(title='Amplification [log]')
+            colorscale = 'Plasma'
         elif mode == 'angle':
-            z = (np.angle(z)) * 180 / (2 * np.pi)
+            z = np.angle(z) * 180 / (np.pi)
             z[-1, -1] = 0
-            z += 2 * np.pi
+            z[z < 0] += 360
             colorbar = dict(title='Phase angle [deg]')
+            colorscale = 'Phase'
         else:
             print('WARNING: mode must be either amp or angle. Plot will show amplification.')
 
@@ -406,6 +420,7 @@ class IntegrationResults():
                                  x=self.fl,
                                  z=z.transpose(),
                                  colorbar=colorbar,
+                                 colorscale=colorscale,
                                  # zmin=-1,
                                  # zmax=1
                                  )
