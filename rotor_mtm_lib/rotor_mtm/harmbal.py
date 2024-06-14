@@ -9,27 +9,6 @@ import pandas as pd
 import os
 from .results import IntegrationResults
 
-def poincare_section(x, t, omg, n_points=10):
-    dt = t[1] - t[0]
-    T = 2 * np.pi / omg
-    N = int(np.ceil(T / dt))
-    dt2 = T / N
-    t2 = np.arange(t[0], t[-1], dt2)
-
-    if len(x.shape) == 1:
-        x2 = np.interp(t2, t, x)
-        pc = x2[::N]
-        pc = pc[-n_points:]
-    else:
-        x2 = np.zeros((x.shape[0],len(t2)))
-        for i in range(len(x[:, 1])):
-            x2[i, :] = np.interp(t2, t, x[i, :])
-        pc = x2[:, ::N]
-        pc = pc[:, -n_points:]
-
-
-    return pc
-
 class Sys_NL:
 
     def __init__(self,
@@ -916,7 +895,7 @@ class Sys_NL:
                     [np.sqrt(
                     np.sum((x_rk[i, int((tf / 2) / dt):] - np.mean(x_rk[i, int((tf / 2) / dt):])) ** 2) / (
                         int((tf / 2) / dt))) for i in range(x_rk.shape[0])])
-                pc.append(poincare_section(x_rk, t_rk, omg, n_points))
+                pc.append(IntegrationResults.poincare_section(x_rk, t_rk, omg, n_points))
 
             print(f'Frequency: {omg:.1f} rad/s -> completed.')
             print('---------')
