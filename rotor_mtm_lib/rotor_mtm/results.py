@@ -82,6 +82,26 @@ class IntegrationResults():
 
         return fig
 
+    def _adjust_plot3d(self, fig):
+
+        fig.update_layout(width=1200,
+                          height=1000,
+                          font=dict(family="Calibri, bold",
+                                    size=16),
+                          yaxis={"gridcolor": "rgb(159, 197, 232)",
+                                "zerolinecolor": "rgb(74, 134, 232)",
+                                },
+                          xaxis={"gridcolor": "rgb(159, 197, 232)",
+                                 "zerolinecolor": "rgb(74, 134, 232)"},
+                          title={'xanchor': 'center',
+                                 'x': 0.4,
+                                 'font': {'family': 'Calibri, bold',
+                                          'size': 25},
+                                 },
+                          )
+
+        return fig
+
     def _calc_rms(self, x, cut=2):
 
         n_cut = int(len(x) / cut)
@@ -486,6 +506,69 @@ class IntegrationResults():
                         y=1.05),
             width=900,
             height=700
+        )
+
+        return fig
+
+    def plot_cascade3d(self,
+                       dof,
+                       max_freq=None,
+                       max_amp=None,
+                       full_spectrum=False,
+                       hanning=True,
+                       log_amplitude=False,
+                       cut=2):
+
+        fig = go.Figure()
+        t = self.ddl[0]['time']
+
+        amp = None
+
+        for i, f in enumerate(self.fl):
+            d = self.ddl[i]
+            if full_spectrum:
+                w, aux = self._calc_full_spectrum(t=t,
+                                                  x=np.interp(t, d['time'], d[dof[0]]),
+                                                  y=np.interp(t, d['time'], d[dof[1]]),
+                                                  hanning=hanning,
+                                                  cut=cut
+                                                  )
+            else:
+                w, aux = self._calc_fourier(t=t,
+                                            x=np.interp(t, d['time'], d[dof]),
+                                            hanning=hanning,
+                                            cut=cut
+                                            )
+
+            if log_amplitude:
+                aux = np.log10(aux)
+
+            fig.add_trace(go.Scatter3d(x=w,
+                                       y=[f] * len(w),
+                                       z=aux,
+                                       showlegend=False,
+                                       mode='lines',
+                                       line=dict(color='blue')))
+
+        if max_freq is None:
+            max_freq = np.max(w)
+
+
+        fig = self._adjust_plot3d(fig)
+
+        if full_spectrum:
+            freq_range = [- max_freq, max_freq]
+        else:
+            freq_range = [0, max_freq]
+
+        fig.update_layout(
+            scene=dict(
+                xaxis=dict(range=freq_range,
+                           title='Response Frequency [rad/s]'),
+                yaxis=dict(range=[np.min(self.fl), np.max(self.fl)],
+                           title='Rotating Speed [rad/s]'),
+                zaxis=dict(title='Amplitude [m]'),
+            ),
         )
 
         return fig
