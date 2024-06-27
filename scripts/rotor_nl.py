@@ -142,11 +142,19 @@ for n in range(n_res):
 
 
 sp_arr = np.linspace(1, 800, 200)[9:]
+# sp_arr = np.arange(300, 500, 4)
 # sp_arr = np.array([300, 350])
 
 omg = 400
 
 tf = 2
+
+# Rigid
+r = rotor_dict['r_rigid']
+Sys_rig = r.create_Sys_NL(x_eq0=(1e-3, None),
+                       sp=sp_arr[0],
+                       cp=1e-4,
+                       n_harm=5)
 
 # Transtun
 r = rotor_dict['r_det_transtun']
@@ -154,11 +162,17 @@ Sys_trans = r.create_Sys_NL(x_eq0=(2 * 1e-3, None),
                        sp=sp_arr[0],
                        cp=1e-4,
                        n_harm=5)
+
+x0_arr = [3, 4, 5, 6]
+Sys_arr = [r.create_Sys_NL(x_eq0=(a * 1e-3, None),
+                       sp=sp_arr[0],
+                       cp=1e-4,
+                       n_harm=5) for a in x0_arr]
 mult = 1
 
 # Flextun
 r = rotor_dict['r_det_flextun']
-Sys_flex = r.create_Sys_NL(x_eq1=(2 * 1 * np.pi / 180, None),
+Sys_flex = r.create_Sys_NL(x_eq1=(1 * np.pi / 180, None),
                        sp=sp_arr[0],
                        cp=1e-4,
                        n_harm=5)
@@ -212,8 +226,8 @@ if plot:
 # fig = go.Figure(data=[go.Scatter(x=t_rk, y=x_rk[probe_dof_x, :])])
 # fig.write_html(f'Rotor_NL/{tf} s.html')
 
-for whirl in ['backward', 'forward']:
-    for f0 in [0.1, 2, 3, 5]: #1, 1.5, 2, 2.5, 3, 4, 4.5, 5]:
+for whirl in ['forward']:#, 'forward']:
+    for f0 in [0.1]: #1, 1.5, 2, 2.5, 3, 4, 4.5, 5]:
         if whirl == 'backward':
             f = {0: f0 * 100 * mult,
                  1: - f0 * 100.j * mult}
@@ -221,38 +235,56 @@ for whirl in ['backward', 'forward']:
             f = {0: f0 * 100 * mult,
                  1: f0 * 100.j * mult}
 
-        #if whirl == 'forward' or f0 not in [0.1, 1, 2, 3, 4, 4.5]:
+        for j, Sys_i in enumerate([Sys_rig]):#enumerate(Sys_arr):
+            res = Sys_i.plot_smart_frf(
+                sp_arr,
+                f,
+                tf=tf,
+                stability_analysis=False,
+                probe_dof=probes_last + probes_res + probes_base,
+                downsampling=downsampling,
+                # save_rms=f'Rotor_NL/rotor_nl_frf_f-{f[0]}.dat',
+                run_hb=False,
+                # save_raw_data='Rotor_NL/',
+                return_results=True,
+                probe_names=probes_last_name + probes_res_name + probes_base_name
+            )
 
-        res = Sys_trans.plot_smart_frf(
-            sp_arr,
-            f,
-            tf=tf,
-            stability_analysis=False,
-            probe_dof=probes_last + probes_res + probes_base,
-            downsampling=downsampling,
-            # save_rms=f'Rotor_NL/rotor_nl_frf_f-{f[0]}.dat',
-            run_hb=False,
-            # save_raw_data='Rotor_NL/',
-            return_results=True,
-            probe_names=probes_last_name + probes_res_name + probes_base_name
-        )
+            with open(f'rigid_results_transtun_{whirl}_f{f[0]}.pic', 'wb') as file:
+                pickle.dump(res, file)
 
-        with open(f'2x0_results_transtun_{whirl}_f{f[0]}.pic', 'wb') as file:
-            pickle.dump(res, file)
-
-        res = Sys_flex.plot_smart_frf(
-            sp_arr,
-            f,
-            tf=tf,
-            stability_analysis=False,
-            probe_dof=probes_last + probes_res_flex + probes_base_flex,
-            downsampling=downsampling,
-            # save_rms=f'Rotor_NL/rotor_nl_frf_f-{f[0]}.dat',
-            run_hb=False,
-            # save_raw_data='Rotor_NL/',
-            return_results=True,
-            probe_names=probes_last_name + probes_res_flex_name + probes_base_flex_name
-        )
-
-        with open(f'2x0_results_flextun_{whirl}_f{f[0]}.pic', 'wb') as file:
-            pickle.dump(res, file)
+        # if whirl == 'forward' or f0 not in [0.1, 1, 2, 3, 4, 4.5]:
+        #
+        #     res = Sys_trans.plot_smart_frf(
+        #         sp_arr,
+        #         f,
+        #         tf=tf,
+        #         stability_analysis=False,
+        #         probe_dof=probes_last + probes_res + probes_base,
+        #         downsampling=downsampling,
+        #         # save_rms=f'Rotor_NL/rotor_nl_frf_f-{f[0]}.dat',
+        #         run_hb=False,
+        #         # save_raw_data='Rotor_NL/',
+        #         return_results=True,
+        #         probe_names=probes_last_name + probes_res_name + probes_base_name
+        #     )
+        #
+        #     with open(f'2x0_results_transtun_{whirl}_f{f[0]}.pic', 'wb') as file:
+        #         pickle.dump(res, file)
+        #
+        # res = Sys_flex.plot_smart_frf(
+        #     sp_arr,
+        #     f,
+        #     tf=tf,
+        #     stability_analysis=False,
+        #     probe_dof=probes_last + probes_res_flex + probes_base_flex,
+        #     downsampling=downsampling,
+        #     # save_rms=f'Rotor_NL/rotor_nl_frf_f-{f[0]}.dat',
+        #     run_hb=False,
+        #     # save_raw_data='Rotor_NL/',
+        #     return_results=True,
+        #     probe_names=probes_last_name + probes_res_flex_name + probes_base_flex_name
+        # )
+        #
+        # with open(f'2x0_results_flextun_{whirl}_f{f[0]}.pic', 'wb') as file:
+        #     pickle.dump(res, file)
