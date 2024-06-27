@@ -972,7 +972,6 @@ def plot_deflected_shape(rotor,y,n_pos,dof,plot_orbits=None,ys=None,isometric=Fa
     
     return fig
 
-
 def plot_maj_ax(rotor, y, n_pos, dof, ys=None):
     # if type(y) != list:
     #     y = [y]

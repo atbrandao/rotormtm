@@ -27,6 +27,34 @@ class IntegrationResults():
                  data_dict_list=obj.ddl,
                  system=obj.system)
 
+    @staticmethod
+    def poincare_section(x,
+                         t,
+                         omg,
+                         n_points=10,
+                         cut=1):
+
+        dt = t[1] - t[0]
+        T = 2 * np.pi / omg
+        N = int(np.ceil(T / dt))
+        dt2 = T / N
+        t0 = (t[-1] - t[0]) / cut
+        t0 = np.round(t0 / T) * T
+        t2 = np.arange(t0, t[-1], dt2)
+
+        if len(x.shape) == 1:
+            x2 = np.interp(t2, t, x)
+            pc = x2[::N]
+            pc = pc[-n_points:]
+        else:
+            x2 = np.zeros((x.shape[0], len(t2)))
+            for i in range(len(x[:, 1])):
+                x2[i, :] = np.interp(t2, t, x[i, :])
+            pc = x2[:, ::N]
+            pc = pc[:, -n_points:]
+
+        return pc
+
     def _find_frequency_index(self, f):
 
         a = np.array(self.fl) - f
@@ -65,13 +93,48 @@ class IntegrationResults():
 
         return rms
 
+    def _calc_full_spectrum(self,
+                            t,
+                            x,
+                            y,
+                            cut=2,
+                            hanning=True,
+                            synch_freq=None,
+                            return_complex=False,
+                            ):
+
+        w, spec_x = self._calc_fourier(t=t,
+                                       x=x,
+                                       cut=cut,
+                                       hanning=hanning,
+                                       synch_freq=synch_freq,
+                                       return_complex=True)
+        w, spec_y = self._calc_fourier(t=t,
+                                       x=y,
+                                       cut=cut,
+                                       hanning=hanning,
+                                       synch_freq=synch_freq,
+                                       return_complex=True)
+
+        fow = 1 / 2 * (spec_x + 1.j * spec_y)
+        back = 1 / 2 * (np.conj(spec_x) + 1.j * np.conj(spec_y))
+
+        w = np.concatenate([- w[-1::-1], np.zeros(1), w])
+        spectrum = np.concatenate([back[-1::-1], np.zeros(1), fow])
+
+        if not return_complex:
+            spectrum = np.abs(spectrum)
+
+        return w, spectrum
+
     def _calc_fourier(self,
                       t,
                       x,
                       cut=2,
                       hanning=True,
                       synch_freq=None,
-                      return_complex=False):
+                      return_complex=False
+                      ):
 
         n_cut = int(len(x) / cut)
         dt = t[1] - t[0]
@@ -102,6 +165,49 @@ class IntegrationResults():
         spectrum = spectrum[:len(w)]
 
         return w, spectrum
+
+    def plot_bifurcation_diagram(self,
+                                 dof=None,
+                                 cut=2,
+                                 n_points=20):
+
+        fig = go.Figure()
+        if dof is None:
+            dof = [j for j in self.ddl[0].keys() if j != 'time']
+
+        omg_bif = []
+        bif_data_dict = {}
+        for k in dof:
+            bif_data_dict[k] = []
+        for i, f in enumerate(self.fl):
+
+            d = self.ddl[i]
+
+            for k in dof:
+                data = self.poincare_section(x=d[k],
+                                             t=d['time'],
+                                             omg=f,
+                                             n_points = n_points,
+                                             cut=cut
+                                             )
+
+                bif_data_dict[k] += list(data)
+
+            omg_bif += [f] * len(data)
+
+        for k in dof:
+            fig.add_trace(go.Scatter(x=omg_bif,
+                                     y=bif_data_dict[k],
+                                     mode='markers',
+                                     name=k,
+                                     )
+                          )
+        fig.update_yaxes(title='Displacement [m]')
+        fig.update_xaxes(title='Excitation Frequency [rad/s]',
+                         range=[np.min(self.fl), np.max(self.fl)])
+        fig = self._adjust_plot(fig)
+
+        return fig
 
     def plot_frf(self,
                  dof=None,
@@ -241,28 +347,51 @@ class IntegrationResults():
         if full_spectrum and len(dof) != 2:
             print('WARNING: Inform X and Y DOFs for full spectrum plot.')
 
-        w, sp = self._calc_fourier(t=t,
-                                   x=d[dof],
-                                   cut=cut,
-                                   hanning=hanning,
-                                   synch_freq=self.fl[i])
+        if full_spectrum:
+            w, sp = self._calc_full_spectrum(t=t,
+                                             x=d[dof[0]],
+                                             y=d[dof[1]],
+                                             cut=cut,
+                                             hanning=hanning,
+                                             synch_freq=self.fl[i])
+        else:
+            w, sp = self._calc_fourier(t=t,
+                                       x=d[dof],
+                                       cut=cut,
+                                       hanning=hanning,
+                                       synch_freq=self.fl[i])
 
         if max_frequency is None:
             max_frequency = np.max(w)
 
         fig.add_trace(go.Scatter(x=w,
                                  y=sp,
-                                 name=dof))
+                                 name=str(dof)))
         fig.add_trace(go.Scatter(x=[self.fl[i]] * 2,
                                  y=[0, 1.1 * np.max(sp)],
                                  mode='lines',
                                  line=dict(dash='dash',
                                            color='black',
                                            width=1),
+                                 legendgroup='synch',
                                  name='Synch. Freq.'))
+        if full_spectrum:
+            fig.add_trace(go.Scatter(x=[- self.fl[i]] * 2,
+                                     y=[0, 1.1 * np.max(sp)],
+                                     mode='lines',
+                                     line=dict(dash='dash',
+                                               color='black',
+                                               width=1),
+                                     legendgroup='synch',
+                                     showlegend=False,
+                                     name='Synch. Freq.'))
+        if full_spectrum:
+            freq_range = [- max_frequency, max_frequency]
+        else:
+            freq_range = [0, max_frequency]
 
         fig.update_layout(title=f'Frequency: {self.fl[i]:.2f}',
-                          xaxis_range=[0, max_frequency],
+                          xaxis_range=freq_range,
                           yaxis_range=[0, 1.1 * np.max(sp)],
                           xaxis_title='Frequency [rad/s]',
                           yaxis_title='Amplitude [m]',
@@ -286,12 +415,19 @@ class IntegrationResults():
 
         for i, f in enumerate(self.fl):
             d = self.ddl[i]
-
-            w, aux = self._calc_fourier(t=t,
-                                        x=np.interp(t, d['time'], d[dof]),
-                                        hanning=hanning,
-                                        cut=cut
-                                        )
+            if full_spectrum:
+                w, aux = self._calc_full_spectrum(t=t,
+                                                  x=np.interp(t, d['time'], d[dof[0]]),
+                                                  y=np.interp(t, d['time'], d[dof[1]]),
+                                                  hanning=hanning,
+                                                  cut=cut
+                                                  )
+            else:
+                w, aux = self._calc_fourier(t=t,
+                                            x=np.interp(t, d['time'], d[dof]),
+                                            hanning=hanning,
+                                            cut=cut
+                                            )
             if amp is None:
                 amp = np.zeros((len(self.fl), len(aux)))
 
@@ -300,9 +436,9 @@ class IntegrationResults():
         if max_freq is None:
             max_freq = np.max(w)
 
-        fig.add_trace(go.Heatmap(y=w,
-                                 x=self.fl,
-                                 z=np.log10(amp.transpose()),
+        fig.add_trace(go.Heatmap(y=self.fl,
+                                 x=w,
+                                 z=np.log10(amp),
                                  colorbar=dict(title='Resp. amp. [log]')
                                  )
                       )
@@ -311,20 +447,38 @@ class IntegrationResults():
                                  y=[0, np.max(self.fl)],
                                  mode='lines',
                                  name='Synchronous line',
-                                 line=dict(dash='dot',
+                                 line=dict(dash='dash',
                                            color='black',
                                            width=1),
+                                 legendgroup='synch',
                                  showlegend=True
                                  )
                       )
+        if full_spectrum:
+            fig.add_trace(go.Scatter(x=[0, - np.max(self.fl)],
+                                     y=[0, np.max(self.fl)],
+                                     mode='lines',
+                                     name='Synchronous line',
+                                     line=dict(dash='dash',
+                                               color='black',
+                                               width=1),
+                                     legendgroup='synch',
+                                     showlegend=False
+                                     )
+                          )
 
         fig = self._adjust_plot(fig)
 
+        if full_spectrum:
+            freq_range = [- max_freq, max_freq]
+        else:
+            freq_range = [0, max_freq]
+
         fig.update_layout(
-            xaxis_range=[np.min(self.fl), np.max(self.fl)],
-            yaxis_range=[0, max_freq],
-            xaxis_title='Excitation frequency [rad/s]',
-            yaxis_title='Response frequency [rad/s]',
+            xaxis_range=freq_range,
+            yaxis_range=[np.min(self.fl), np.max(self.fl)],
+            xaxis_title='Response Frequency [rad/s]',
+            yaxis_title='Rotating Speed [rad/s]',
             legend=dict(orientation='h',
                         xanchor='center',
                         x=0.5,
@@ -416,9 +570,9 @@ class IntegrationResults():
         if max_freq is None:
             max_freq = np.max(w)
 
-        fig.add_trace(go.Heatmap(y=w,
-                                 x=self.fl,
-                                 z=z.transpose(),
+        fig.add_trace(go.Heatmap(y=self.fl,
+                                 x=w,
+                                 z=z,
                                  colorbar=colorbar,
                                  colorscale=colorscale,
                                  # zmin=-1,
@@ -438,11 +592,17 @@ class IntegrationResults():
                       )
 
         fig = self._adjust_plot(fig)
+
+        if full_spectrum:
+            freq_range = [- max_freq, max_freq]
+        else:
+            freq_range = [0, max_freq]
+
         fig.update_layout(
-            xaxis_range=[np.min(self.fl), np.max(self.fl)],
-            yaxis_range=[0, max_freq],
-            xaxis_title='Excitation frequency [rad/s]',
-            yaxis_title='Response frequency [rad/s]',
+            xaxis_range=freq_range,
+            yaxis_range=[np.min(self.fl), np.max(self.fl)],
+            xaxis_title='Response Frequency [rad/s]',
+            yaxis_title='Rotating Speed [rad/s]',
             legend=dict(orientation='h',
                         xanchor='center',
                         x=0.5,
