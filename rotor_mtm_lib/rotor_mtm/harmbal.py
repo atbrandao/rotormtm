@@ -984,9 +984,10 @@ class Sys_NL:
              np.hstack([la.solve(-self.M, self.K), la.solve(-self.M, self.C)])])
 
     def plot_smart_frf(self, omg_range, f, tf=300, dt_base=None,
-                 continuation=True, method=None, probe_dof=None, dt_refine=None,
-                 stability_analysis=True, save_rms=None, downsampling=1, run_hb=True,
-                       save_raw_data=False, return_results=False, probe_names=None):
+                       continuation=True, method=None, probe_dof=None, dt_refine=None,
+                       stability_analysis=True, save_rms=None, downsampling=1, run_hb=True,
+                       save_raw_data=False, return_results=False, probe_names=None,
+                       gyroscopic=True):
 
         rms = np.zeros((len(probe_dof), len(omg_range)))
         pc = []
@@ -1012,11 +1013,13 @@ class Sys_NL:
         thb = 0
 
         data_dict_list = []
+        self.update_speed(speed=0)
 
         for i, omg in enumerate(omg_range):
 
-            if self.rotor is not None:
+            if self.rotor is not None and gyroscopic:
                 self.update_speed(speed=omg)
+
 
             t0 = time.time()
             if run_hb:
