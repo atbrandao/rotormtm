@@ -1014,8 +1014,14 @@ class Sys_NL:
 
         data_dict_list = []
         self.update_speed(speed=0)
+        if 'unbalance' in f.keys() and f['unbalance']:
+            f_original = [f[0], f[1]]
 
         for i, omg in enumerate(omg_range):
+
+            if 'unbalance' in f.keys() and f['unbalance']:
+                f[0] = f_original[0] * omg ** 2
+                f[1] = f_original[1] * omg ** 2
 
             if self.rotor is not None and gyroscopic:
                 self.update_speed(speed=omg)
