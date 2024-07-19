@@ -8,6 +8,7 @@ import subprocess
 import pandas as pd
 import os
 from .results import IntegrationResults
+from copy import deepcopy
 
 class Sys_NL:
 
@@ -987,7 +988,7 @@ class Sys_NL:
                        continuation=True, method=None, probe_dof=None, dt_refine=None,
                        stability_analysis=True, save_rms=None, downsampling=1, run_hb=True,
                        save_raw_data=False, return_results=False, probe_names=None,
-                       gyroscopic=True):
+                       gyroscopic=True, unbalance=False):
 
         rms = np.zeros((len(probe_dof), len(omg_range)))
         pc = []
@@ -1014,14 +1015,15 @@ class Sys_NL:
 
         data_dict_list = []
         self.update_speed(speed=0)
-        if 'unbalance' in f.keys() and f['unbalance']:
-            f_original = [f[0], f[1]]
+        if unbalance:
+            f_original = deepcopy(f)
 
         for i, omg in enumerate(omg_range):
 
-            if 'unbalance' in f.keys() and f['unbalance']:
-                f[0] = f_original[0] * omg ** 2
-                f[1] = f_original[1] * omg ** 2
+            if unbalance:
+                for k in f.keys():
+                    if type(k) == int:
+                        f[k] = f_original[k] * omg ** 2
 
             if self.rotor is not None and gyroscopic:
                 self.update_speed(speed=omg)
@@ -1183,6 +1185,8 @@ class Sys_NL:
         #                   font=dict(family="Calibri, bold",
         #                             size=18))
         # fig_cost.update_yaxes(type="log")
+        if unbalance:
+            f = deepcopy(f_original)
 
         if return_results:
             return IntegrationResults(data_dict_list=data_dict_list,
