@@ -553,7 +553,6 @@ class IntegrationResults():
         if max_freq is None:
             max_freq = np.max(w)
 
-
         fig = self._adjust_plot3d(fig)
 
         if full_spectrum:
@@ -576,37 +575,58 @@ class IntegrationResults():
     def _calc_diff(self,
                    t,
                    x,
+                   y=None,
                    cut=2,
                    hanning=True,
                    synch_freq=None):
 
-        w, spec_1 = self._calc_fourier(t=t,
-                                    x=x[0],
-                                    cut=cut,
-                                    hanning=hanning,
-                                    synch_freq=synch_freq,
-                                    return_complex=True)
+        if y is not None:
+            w, spec_1 = self._calc_full_spectrum(t=t,
+                                             x=x[0],
+                                             y=y[0],
+                                             cut=cut,
+                                             hanning=hanning,
+                                             synch_freq=synch_freq,
+                                             return_complex=True)
 
-        _, spec_2 = self._calc_fourier(t=t,
-                                    x=x[1],
-                                    cut=cut,
-                                    hanning=hanning,
-                                    synch_freq=synch_freq,
-                                    return_complex=True)
+            _, spec_2 = self._calc_full_spectrum(t=t,
+                                                 x=x[1],
+                                                 y=y[1],
+                                                 cut=cut,
+                                                 hanning=hanning,
+                                                 synch_freq=synch_freq,
+                                                 return_complex=True)
+        else:
+            w, spec_1 = self._calc_fourier(t=t,
+                                        x=x[0],
+                                        cut=cut,
+                                        hanning=hanning,
+                                        synch_freq=synch_freq,
+                                        return_complex=True)
+
+            _, spec_2 = self._calc_fourier(t=t,
+                                        x=x[1],
+                                        cut=cut,
+                                        hanning=hanning,
+                                        synch_freq=synch_freq,
+                                        return_complex=True)
 
         diff = spec_1 / spec_2
+        # diff = np.zeros(spec_1.shape).astype(complex)
+        # diff[spec_2.nonzero()] = spec_1[spec_2.nonzero()] / spec_2[spec_2.nonzero()]
 
         return w, diff
 
-    def plot_diff_heatmap(self,
-                          dof,
-                          mode='amp',
-                          max_freq=None,
-                          max_amp=None,
-                          full_spectrum=False,
-                          hanning=False,
-                          cut=2
-                          ):
+    def plot_diff_map(self,
+                      dof,
+                      dof_y=None,
+                      mode='amp',
+                      max_freq=None,
+                      max_amp=None,
+                      full_spectrum=False,
+                      hanning=False,
+                      cut=2,
+                      log_mode=False):
 
         fig = go.Figure()
         t = self.ddl[0]['time']
@@ -616,20 +636,38 @@ class IntegrationResults():
         for i, f in enumerate(self.fl):
             d = self.ddl[i]
 
-            aux = None
-            for dof_i in dof:
-                w, aux2 = self._calc_diff(t=t,
-                                         x=(
-                                             np.interp(t, d['time'], d[dof_i[0]]),
-                                             np.interp(t, d['time'], d[dof_i[1]])
-                                         ),
-                                         hanning=hanning,
-                                         cut=cut
-                                         )
-                if aux is None:
-                    aux = aux2
+            aux = 0
+            for j, dof_i in enumerate(dof):
+                if full_spectrum:
+                    w, aux2 = self._calc_diff(t=t,
+                                              x=(
+                                                  np.interp(t, d['time'], d[dof_i[0]]),
+                                                  np.interp(t, d['time'], d[dof_i[1]])
+                                              ),
+                                              y=(
+                                                  np.interp(t, d['time'], d[dof_y[j][0]]),
+                                                  np.interp(t, d['time'], d[dof_y[j][1]])
+                                              ),
+                                              hanning=hanning,
+                                              cut=cut
+                                              )
                 else:
-                    aux = (aux + aux2) / 2
+                    w, aux2 = self._calc_diff(t=t,
+                                             x=(
+                                                 np.interp(t, d['time'], d[dof_i[0]]),
+                                                 np.interp(t, d['time'], d[dof_i[1]])
+                                             ),
+                                             hanning=hanning,
+                                             cut=cut
+                                             )
+
+                aux += aux2
+
+            aux = aux / len(dof)
+                # if aux is None:
+                #     aux = aux2
+                # else:
+                #     aux = (aux + aux2) / 2
 
 
             if z is None:
@@ -637,29 +675,64 @@ class IntegrationResults():
 
             z[i, :] = aux
 
+        if max_freq is None:
+            max_freq = np.max(w)
+
+        if full_spectrum:
+            freq_range = [- max_freq, max_freq]
+        else:
+            freq_range = [0, max_freq]
+
         if mode == 'amp':
-            z = np.log10(np.abs(z))
+            if log_mode:
+                z = np.log10(np.abs(z))
+                zmin = np.min(z)
+                zmax = 10
+            else:
+                z = np.abs(z)
+                zmin = np.min(z)
+                zmax = np.max(z)
+
             colorbar = dict(title='Amplification [log]')
             colorscale = 'Plasma'
+            # for i, f in enumerate(self.fl):
+            #     fig.add_trace(go.Scatter3d(x=w,
+            #                                y=[f] * len(w),
+            #                                z=z[i, :],
+            #                                showlegend=False,
+            #                                mode='lines',
+            #                                line=dict(color='blue')))
+            #
+            # fig = self._adjust_plot3d(fig)
+            #
+            # fig.update_layout(
+            #     scene=dict(
+            #         xaxis=dict(range=freq_range,
+            #                    title='Response Frequency [rad/s]'),
+            #         yaxis=dict(range=[np.min(self.fl), np.max(self.fl)],
+            #                    title='Rotating Speed [rad/s]'),
+            #         zaxis=dict(title='Amplification [m]'),
+            #     ),
+            # )
+
         elif mode == 'angle':
             z = np.angle(z) * 180 / (np.pi)
-            z[-1, -1] = 0
+            zmin = 0
+            zmax = 360
+            # z[-1, -1] = 0
             z[z < 0] += 360
             colorbar = dict(title='Phase angle [deg]')
             colorscale = 'Phase'
-        else:
-            print('WARNING: mode must be either amp or angle. Plot will show amplification.')
-
-        if max_freq is None:
-            max_freq = np.max(w)
+        # else:
+        #     print('WARNING: mode must be either amp or angle. Plot will show amplification.')
 
         fig.add_trace(go.Heatmap(y=self.fl,
                                  x=w,
                                  z=z,
                                  colorbar=colorbar,
                                  colorscale=colorscale,
-                                 # zmin=-1,
-                                 # zmax=1
+                                 zmin=zmin,
+                                 zmax=zmax
                                  )
                       )
 
@@ -667,19 +740,27 @@ class IntegrationResults():
                                  y=[0, np.max(self.fl)],
                                  mode='lines',
                                  name='Synchronous line',
+                                 legendgroup='synch',
                                  line=dict(dash='dot',
                                            color='black',
                                            width=1),
                                  showlegend=True
                                  )
                       )
+        if full_spectrum:
+            fig.add_trace(go.Scatter(x=[0, - np.max(self.fl)],
+                                     y=[0, np.max(self.fl)],
+                                     mode='lines',
+                                     name='Synchronous line',
+                                     legendgroup='synch',
+                                     line=dict(dash='dot',
+                                               color='black',
+                                               width=1),
+                                     showlegend=False
+                                     )
+                          )
 
         fig = self._adjust_plot(fig)
-
-        if full_spectrum:
-            freq_range = [- max_freq, max_freq]
-        else:
-            freq_range = [0, max_freq]
 
         fig.update_layout(
             xaxis_range=freq_range,
