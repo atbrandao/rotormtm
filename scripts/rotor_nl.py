@@ -53,7 +53,7 @@ o_d = 0.14
 L = 0.04
 n_center = 15
 var = 0.6
-f_0 = 377 #10000 # 1800/60*2*np.pi # em rad/s
+f_0 = 400 #377 #10000 # 1800/60*2*np.pi # em rad/s
 f_1 = 634.793 # 1800/60*2*np.pi # em rad/s
 p_damp = 1e-4
 ge = True
@@ -163,6 +163,12 @@ Sys_trans = r.create_Sys_NL(x_eq0=(2 * 1e-3, None),
                        cp=1e-4,
                        n_harm=5)
 
+r = rotor_dict['r_var1_transtun']
+Sys_trans_var = r.create_Sys_NL(x_eq0=(2 * 1e-3, None),
+                       sp=sp_arr[0],
+                       cp=1e-4,
+                       n_harm=5)
+
 x0_arr = [3, 4, 5, 6]
 Sys_arr = [r.create_Sys_NL(x_eq0=(a * 1e-3, None),
                        sp=sp_arr[0],
@@ -226,32 +232,43 @@ if plot:
 # fig = go.Figure(data=[go.Scatter(x=t_rk, y=x_rk[probe_dof_x, :])])
 # fig.write_html(f'Rotor_NL/{tf} s.html')
 
-for whirl in ['forward']:#, 'forward']:
-    for f0 in [0.1]: #1, 1.5, 2, 2.5, 3, 4, 4.5, 5]:
+k = 0
+for whirl in ['unbalance', 'backward', 'forward']:#, 'forward']:
+    for f0 in [6, 5, 4, 3, 2, 0.1]: #1, 1.5, 2, 2.5, 3, 4, 4.5, 5]:
         if whirl == 'backward':
             f = {0: f0 * 100 * mult,
                  1: - f0 * 100.j * mult}
         elif whirl == 'forward':
             f = {0: f0 * 100 * mult,
                  1: f0 * 100.j * mult}
-
-        for j, Sys_i in enumerate([Sys_rig]):#enumerate(Sys_arr):
-            res = Sys_i.plot_smart_frf(
-                sp_arr,
-                f,
-                tf=tf,
-                stability_analysis=False,
-                probe_dof=probes_last + probes_res + probes_base,
-                downsampling=downsampling,
-                # save_rms=f'Rotor_NL/rotor_nl_frf_f-{f[0]}.dat',
-                run_hb=False,
-                # save_raw_data='Rotor_NL/',
-                return_results=True,
-                probe_names=probes_last_name + probes_res_name + probes_base_name
-            )
-
-            with open(f'rigid_results_transtun_{whirl}_f{f[0]}.pic', 'wb') as file:
-                pickle.dump(res, file)
+        elif whirl == 'unbalance':
+            f = {0: f0 * 1e-6 * 6350 * rotor_dict['r_rigid'].rotor_solo_disks.m / (f_0 * 60 / (2 * np.pi)),
+                 1: f0 * 1e-6 * 1.j * 6350 * rotor_dict['r_rigid'].rotor_solo_disks.m / (f_0 * 60 / (2 * np.pi)),
+                 'unbalance': True}
+        if (whirl == 'backward' and f0 < 4.5) or (whirl == 'forward' and f0 < 5.5):
+            k = 1
+        else:
+            for j, Sys_i in enumerate([Sys_trans, Sys_trans_var]):#enumerate(Sys_arr):
+                res = Sys_i.plot_smart_frf(
+                    sp_arr,
+                    f,
+                    tf=tf,
+                    stability_analysis=False,
+                    probe_dof=probes_last + probes_res + probes_base,
+                    downsampling=downsampling,
+                    # save_rms=f'Rotor_NL/rotor_nl_frf_f-{f[0]}.dat',
+                    run_hb=False,
+                    # save_raw_data='Rotor_NL/',
+                    return_results=True,
+                    probe_names=probes_last_name + probes_res_name + probes_base_name,
+                    gyroscopic=True
+                )
+                if j == 0:
+                    with open(f'2x0_results_transtun400_{whirl}_f{f[0]}.pic', 'wb') as file:
+                        pickle.dump(res, file)
+                else:
+                    with open(f'2x0_results_transtun400var_{whirl}_f{f[0]}.pic', 'wb') as file:
+                        pickle.dump(res, file)
 
         # if whirl == 'forward' or f0 not in [0.1, 1, 2, 3, 4, 4.5]:
         #
