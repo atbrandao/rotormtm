@@ -984,7 +984,7 @@ class Sys_NL:
             [np.hstack([Z, I]),
              np.hstack([la.solve(-self.M, self.K), la.solve(-self.M, self.C)])])
 
-    def plot_smart_frf(self, omg_range, f, tf=300, dt_base=None,
+    def plot_smart_frf(self, omg_range, force, tf=300, dt_base=None,
                        continuation=True, method=None, probe_dof=None, dt_refine=None,
                        stability_analysis=True, save_rms=None, downsampling=1, run_hb=True,
                        save_raw_data=False, return_results=False, probe_names=None,
@@ -1016,14 +1016,19 @@ class Sys_NL:
         data_dict_list = []
         self.update_speed(speed=0)
         if unbalance:
-            f_original = deepcopy(f)
+            f_kgm = {}
+            f = {}
+            for k in force.keys():
+                f_kgm[k * 4] = force[k]
+                f_kgm[k * 4 + 1] = force[k] * 1.j
+        else:
+            f = force
 
         for i, omg in enumerate(omg_range):
 
             if unbalance:
-                for k in f.keys():
-                    if type(k) == int:
-                        f[k] = f_original[k] * omg ** 2
+                for k in f_kgm.keys():
+                    f[k] = f_kgm[k] * omg ** 2
 
             if self.rotor is not None and gyroscopic:
                 self.update_speed(speed=omg)
@@ -1162,31 +1167,6 @@ class Sys_NL:
                           font=dict(family="Calibri, bold",
                                     size=18))
         fig.update_yaxes(type="log")
-        #
-        # fig_cost = go.Figure(data=[go.Scatter(x=omg_range, y=cost_hb, name='Cost HB'),
-        #                        go.Scatter(x=[omg_range[i] for i in range(len(omg_range)) if rms_hb[-1, i] == 1],
-        #                                   y=[cost_hb[i] for i in range(len(omg_range)) if rms_hb[-1, i] == 1],
-        #                                   name='Flagged', mode='markers', marker=dict(color='black'),
-        #                                   legendgroup='flag'),
-        #                        ])
-        # fig_cost.update_layout(title={'xanchor': 'center',
-        #                          'x': 0.4,
-        #                          'font': {'family': 'Arial, bold',
-        #                                   'size': 15},
-        #                          },
-        #                   yaxis={"gridcolor": "rgb(159, 197, 232)",
-        #                          "zerolinecolor": "rgb(74, 134, 232)",
-        #                          },
-        #                   xaxis={'range': [0, np.max(omg_range)],
-        #                          "gridcolor": "rgb(159, 197, 232)",
-        #                          "zerolinecolor": "rgb(74, 134, 232)"},
-        #                   xaxis_title='Frequency (rad/s)',
-        #                   yaxis_title='Cost function norm',
-        #                   font=dict(family="Calibri, bold",
-        #                             size=18))
-        # fig_cost.update_yaxes(type="log")
-        if unbalance:
-            f = deepcopy(f_original)
 
         if return_results:
             return IntegrationResults(data_dict_list=data_dict_list,
