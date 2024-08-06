@@ -243,20 +243,24 @@ if plot:
 # fig.write_html(f'Rotor_NL/{tf} s.html')
 
 k = 0
-for whirl in ['backward', 'forward', 'unbalance']:#, 'forward']:
-    for f0 in [6, 5, 4, 3, 2, 0.1]: #1, 1.5, 2, 2.5, 3, 4, 4.5, 5]:
+for whirl in ['unbalance']:#, 'forward']:
+    for f0 in [0.1, 10, 6, 4, 2]: #1, 1.5, 2, 2.5, 3, 4, 4.5, 5]:
         if whirl == 'backward':
-            f = {0: f0 * 100 * mult,
-                 1: - f0 * 100.j * mult}
+            f = {
+                0: f0 * 100 * mult,
+                1: - f0 * 100.j * mult
+            }
             unbalance = False,
         elif whirl == 'forward':
-            f = {0: f0 * 100 * mult,
-                 1: f0 * 100.j * mult}
+            f = {
+                0: f0 * 100 * mult,
+                1: f0 * 100.j * mult
+            }
             unbalance = False
         elif whirl == 'unbalance':
-            f = {0: f0 * 1e-6 * 6350 * rotor_dict['r_rigid'].rotor_solo_disks.m / (f_0 * 60 / (2 * np.pi)),
-                 1: f0 * 1e-6 * 1.j * 6350 * rotor_dict['r_rigid'].rotor_solo_disks.m / (f_0 * 60 / (2 * np.pi))
-                 }
+            f = {
+                0: f0 * 1e-6 * 6350 * rotor_dict['r_rigid'].rotor_solo_disks.m / (f_0 * 60 / (2 * np.pi)),
+            }
             unbalance = True
 
         if (whirl == 'backward' and f0 < 4.5) or (whirl == 'forward' and f0 < 5.5):
@@ -265,9 +269,11 @@ for whirl in ['backward', 'forward', 'unbalance']:#, 'forward']:
             if whirl == 'unbalance':
                 Sys_arr = [Sys_trans05, Sys_trans_var05]
                 str_x0 = '05'
+                str_f = str(f0)
             else:
                 Sys_arr = [Sys_trans, Sys_trans_var]
                 str_x0 = '2'
+                str_f = str(f[0])
 
             for j, Sys_i in enumerate(Sys_arr):#enumerate(Sys_arr):
                 res = Sys_i.plot_smart_frf(
@@ -287,10 +293,10 @@ for whirl in ['backward', 'forward', 'unbalance']:#, 'forward']:
                 )
 
                 if j == 0:
-                    with open(f'{str_x0}x0_results_transtun400_{whirl}_f{round(f[0])}.pic', 'wb') as file:
+                    with open(f'{str_x0}x0_results_transtun400_{whirl}_f{str_f}.pic', 'wb') as file:
                         pickle.dump(res, file)
                 else:
-                    with open(f'{str_x0}x0_results_transtun400var_{whirl}_f{round(f[0])}.pic', 'wb') as file:
+                    with open(f'{str_x0}x0_results_transtun400var_{whirl}_f{str_f}.pic', 'wb') as file:
                         pickle.dump(res, file)
 
 
