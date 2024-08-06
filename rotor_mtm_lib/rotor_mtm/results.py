@@ -721,7 +721,9 @@ class IntegrationResults():
             zmax = 360
             # z[-1, -1] = 0
             z[z < 0] += 360
-            colorbar = dict(title='Phase angle [deg]')
+            colorbar = dict(title='Phase angle [deg]',
+                            tickvals=[0, 90, 180, 270, 360],
+                            ticktext=["0", "90", "180", "270", "360"],)
             colorscale = 'Phase'
         # else:
         #     print('WARNING: mode must be either amp or angle. Plot will show amplification.')
