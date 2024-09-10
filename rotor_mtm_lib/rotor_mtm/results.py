@@ -102,16 +102,48 @@ class IntegrationResults():
 
         return fig
 
-    def _calc_rms(self, x, cut=2):
+    def _calc_amplitude(self,
+                        x,
+                        cut=2,
+                        amplitude_units='rms'):
 
-        n_cut = int(len(x) / cut)
-        x_cut = x[-n_cut:]
+        if amplitude_units == 'rms':
+            n_cut = int(len(x) / cut)
+            x_cut = x[-n_cut:]
 
-        rms = np.sqrt(
-           np.sum((x_cut - np.mean(x_cut)) ** 2) / n_cut
-        )
+            amp = np.sqrt(
+               np.sum((x_cut - np.mean(x_cut)) ** 2) / n_cut
+            )
 
-        return rms
+        elif amplitude_units == 'max_displacement':
+
+            n_cut = int(len(x[0]) / cut)
+            d_cut = np.sqrt(
+                (
+                        x[0][-n_cut:] - np.mean(x[0][-n_cut:])
+                ) ** 2 + (
+                        x[1][-n_cut:] - np.mean(x[1][-n_cut:])
+                ) ** 2
+            )
+
+            amp = np.max(d_cut)
+
+        elif amplitude_units == 'pk':
+
+            n_cut = int(len(x) / cut)
+            x_cut = x[-n_cut:]
+
+            amp = np.max(np.abs(x_cut - np.mean(x_cut)))
+
+        elif amplitude_units == 'pk-pk':
+
+            n_cut = int(len(x) / cut)
+            x_cut = x[-n_cut:]
+
+            amp = np.max(x_cut) - np.min(x_cut)
+
+
+        return amp
 
     def _calc_full_spectrum(self,
                             t,
@@ -231,7 +263,8 @@ class IntegrationResults():
 
     def plot_frf(self,
                  dof=None,
-                 cut=2):
+                 cut=2,
+                 amplitude_units='rms'):
 
         fig = go.Figure()
         if dof is None:
@@ -243,9 +276,18 @@ class IntegrationResults():
 
             d = self.ddl[i]
 
-            rms[:, i] = np.array(
-                [self._calc_rms(d[k],
-                                cut=cut) for k in dof])
+            if amplitude_units == 'max_displacement':
+                d_aux = [(d[k[0]], d[k[1]]) for k in dof]
+                rms[:, i] = np.array(
+                    [self._calc_amplitude(k,
+                                          cut=cut,
+                                          amplitude_units=amplitude_units) for k in d_aux])
+
+            else:
+                rms[:, i] = np.array(
+                    [self._calc_amplitude(d[k],
+                                          cut=cut,
+                                          amplitude_units=amplitude_units) for k in dof])
 
         for i, p in enumerate(dof):
             fig.add_trace(go.Scatter(x=self.fl, y=rms[i, :], name=f'DoF: {p}'))
@@ -329,10 +371,10 @@ class IntegrationResults():
                                      )
                           )
 
-            if np.max(d[i[0]]) > max_amp:
-                max_amp = np.max(d[i[0]])
-            if np.max(d[i[1]]) > max_amp:
-                max_amp = np.max(d[i[1]])
+            if np.max(np.abs(d[i[0]])) > max_amp:
+                max_amp = np.max(np.abs(d[i[0]]))
+            if np.max(np.abs(d[i[1]])) > max_amp:
+                max_amp = np.max(np.abs(d[i[1]]))
 
         fig.update_layout(title=f'Orbit Plot',
                           xaxis_range=[- 1.1 * max_amp, 1.1 * max_amp],
