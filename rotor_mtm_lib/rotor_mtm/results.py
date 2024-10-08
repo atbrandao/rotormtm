@@ -7,7 +7,9 @@ class IntegrationResults():
     def __init__(self,
                  frequency_list,
                  data_dict_list,
-                 system):
+                 system=None,
+                 probe_dof=None,
+                 linear_results=None):
 
         self.frequency_list = frequency_list
         self.fl = self.frequency_list
@@ -19,6 +21,8 @@ class IntegrationResults():
             print('WARNING: length of frequency and data dict lists do not match.')
 
         self.system = system
+        self.probe_dof = probe_dof
+        self.linear_results = linear_results
 
     @classmethod
     def update_class_object(cls, obj):
@@ -62,7 +66,8 @@ class IntegrationResults():
 
         return i
 
-    def _adjust_plot(self, fig):
+    @staticmethod
+    def _adjust_plot(fig):
 
         fig.update_layout(width=800,
                           height=700,
@@ -102,8 +107,8 @@ class IntegrationResults():
 
         return fig
 
-    def _calc_amplitude(self,
-                        x,
+    @staticmethod
+    def _calc_amplitude(x,
                         cut=2,
                         amplitude_units='rms'):
 
@@ -821,3 +826,106 @@ class IntegrationResults():
         )
 
         return fig
+
+
+class LinearResults():
+
+    def __init__(self,
+                 frequency_list,
+                 res_forward,
+                 res_backward,
+                 system):
+
+        self.frequency_list = frequency_list
+        self.res_forward = res_forward
+        self.res_backward = res_backward
+        self.system = system
+
+        self.rf = self.res_forward
+        self.rb = self.res_backward
+        self.fl = self.frequency_list
+
+    def _calc_amplitude(self,
+                        x,
+                        amplitude_units='rms'):
+
+        t = 5 * 2 * np.pi * np.linspace(0, 1, 50)
+        if amplitude_units == 'max_displacement':
+            aux = []
+            for a in x:
+                aux.append(np.abs(a) * np.sin(t + np.angle(a)))
+
+            amp = IntegrationResults._calc_amplitude(x=aux,
+                                                     cut=1,
+                                                     amplitude_units=amplitude_units)
+        elif amplitude_units == 'rms':
+            amp = np.abs(x) / np.sqrt(2)
+
+        elif amplitude_units == 'pk':
+            amp = np.abs(x)
+
+        elif amplitude_units == 'pk-pk':
+            amp = np.abs(x) * 2
+
+        return amp
+
+    def plot_frf(self,
+                 dof=None,
+                 whirl='both',
+                 amplitude_units='rms'):
+
+        fig_f = go.Figure()
+        fig_b = go.Figure()
+        if dof is None:
+            dof = [j for j in self.rf.keys()]
+        if whirl == 'both':
+            dl = [self.rf, self.rb]
+        elif whirl == 'forward' or 'unbalance':
+            dl = [self.rf]
+        elif whirl == 'backward':
+            dl = [self.rb]
+
+        amp = np.zeros((len(dof), len(self.fl), len(dl)))
+
+        for i, d in enumerate(dl):
+
+            if amplitude_units == 'max_displacement' or amplitude_units == 'major_axis':
+                d_aux = [(d[k[0]], d[k[1]]) for k in dof]
+                amp[:, :, i] = np.array([
+                    [self._calc_amplitude((k[0][j], k[1][j]),
+                                          amplitude_units=amplitude_units) for j in range(len(self.fl))] for k in
+                    d_aux])
+            else:
+                amp[:, :, i] = np.array([
+                    [self._calc_amplitude(d[k][j],
+                                          amplitude_units=amplitude_units) for j in range(len(self.fl))] for k in
+                    dof])
+
+        for i, p in enumerate(dof):
+            fig_f.add_trace(go.Scatter(x=self.fl, y=amp[i, :, 0], name=f'DoF: {p}'))
+        if amp.shape[2] == 2:
+            for i, p in enumerate(dof):
+                fig_b.add_trace(go.Scatter(x=self.fl, y=amp[i, :, 1], name=f'DoF: {p}'))
+
+        fig_f.update_layout(
+            xaxis={'range': [0, np.max(self.fl)],
+                   },
+            xaxis_title='Frequency [rad/s]',
+            yaxis_title='Amplitude [m RMS]',
+            title='Forward Excitation'
+        )
+        fig_f.update_yaxes(type="log")
+
+        fig_b.update_layout(
+            xaxis={'range': [0, np.max(self.fl)],
+                   },
+            xaxis_title='Frequency [rad/s]',
+            yaxis_title='Amplitude [m RMS]',
+            title='Backward Excitation'
+        )
+        fig_b.update_yaxes(type="log")
+
+        fig_f = IntegrationResults._adjust_plot(fig_f)
+        fig_b = IntegrationResults._adjust_plot(fig_b)
+
+        return fig_f, fig_b

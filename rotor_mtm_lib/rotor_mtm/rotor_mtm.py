@@ -5,6 +5,7 @@ from scipy import linalg as la
 import sys
 import plotly.graph_objects as go
 from .harmbal import Sys_NL
+from .results import LinearResults
 
 class RotorMTM:
 
@@ -356,7 +357,43 @@ class RotorMTM:
 
         return y[:N], y_b[:N]
 
-    def run_analysis(self, sp_arr, n_modes=50, dof=0, dof_show=0, diff_lim=5,unb_node=0,probe_node=None,
+    def calc_frf(self,
+                 sp_arr,
+                 f,
+                 probe_dof=None,
+                 probe_names=None,
+                 f_node=0,
+                 rotor_solo=False,
+                 silent=True
+                 ):
+
+        if probe_dof is None:
+            probe_dof = [a for a in range(self.N)]
+
+        if probe_names is None:
+            probe_names = [str(p) for p in probe_dof]
+
+        res_fow = {p: np.zeros(len(sp_arr)).astype(complex) for p in probe_names}
+        res_back = {p: np.zeros(len(sp_arr)).astype(complex) for p in probe_names}
+        for i, omg in enumerate(sp_arr):
+            r = self.x_out(sp=omg,
+                           f=omg,
+                           unb_node=f_node,
+                           rotor_solo=rotor_solo)
+
+            for j, p in enumerate(probe_names):
+                res_fow[p][i] = f[i] * r[0][probe_dof[j], 0]
+                res_back[p][i] = f[i] * r[1][probe_dof[j], 0]
+
+            if not silent:
+                print(f'Linear response calculated for frequency: {omg:.1f} rad/s')
+
+        return LinearResults(sp_arr,
+                             res_fow,
+                             res_back,
+                             self)
+
+    def run_analysis(self, sp_arr, n_modes=50, dof=0, dof_show=0, diff_lim=5, unb_node=0, probe_node=None,
                      heatmap=False, diff_analysis=False, cross_prod=False, energy=False, silent=False):
 
         prog_bar_width = 40
@@ -628,7 +665,7 @@ def plot_diff_modal(w, diff, sp_arr, mode='abs',n_plot=None,saturate=None, color
                                y=w[a], mode='markers',
                                text=[f'{a} {i}' for i in range(len(w[a]))],
                                marker={'color': (np.mean(np.angle(diff[a]), 1)),
-                                       # 'colorscale':'spectral',
+                                       'colorscale':'Phase',
                                        'colorbar': dict(title=(['Phase (rad)'] + [None] * (len(sp_arr) - 1))[a],),
                                        'size': 3,
                                        'cmin': 0,
