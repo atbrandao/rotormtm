@@ -9,7 +9,8 @@ class IntegrationResults():
                  data_dict_list,
                  system=None,
                  probe_dof=None,
-                 linear_results=None):
+                 linear_results=None,
+                 rigid_results=None):
 
         self.frequency_list = frequency_list
         self.fl = self.frequency_list
@@ -23,13 +24,16 @@ class IntegrationResults():
         self.system = system
         self.probe_dof = probe_dof
         self.linear_results = linear_results
+        self.rigid_results = rigid_results
 
     @classmethod
     def update_class_object(cls, obj):
-
+        
         return cls(frequency_list=obj.fl,
                  data_dict_list=obj.ddl,
-                 system=obj.system)
+                 system=obj.system,
+                 linear_results=obj.linear_results,
+                 rigid_results=obj.rigid_results)
 
     @staticmethod
     def poincare_section(x,
@@ -902,7 +906,11 @@ class LinearResults():
                     dof])
 
         for i, p in enumerate(dof):
+           
             fig_f.add_trace(go.Scatter(x=self.fl, y=amp[i, :, 0], name=f'DoF: {p}'))
+            if 'unb' in whirl:
+                fig_f.data[-1].y = fig_f.data[-1].y * self.fl ** 2
+                
         if amp.shape[2] == 2:
             for i, p in enumerate(dof):
                 fig_b.add_trace(go.Scatter(x=self.fl, y=amp[i, :, 1], name=f'DoF: {p}'))
