@@ -12,13 +12,15 @@ for f in picfiles:
     with open(f, 'rb') as file:
         res = load(file)
     # res = IntegrationResults.update_class_object(res)
+    update = False
     
     if 'system' in res.__dict__:
 
         r = res.system.rotor
 
         for el in r._rotor.elements:
-            if type(el) == rs.PointMass:
+            if type(el) == rs.PointMass and 'size' not in el.__dict__:
+                update = True
                 el.size = 2
 
         last_dof = [r.rotor_solo_disks.nodes[-1] * 4,
@@ -38,25 +40,28 @@ for f in picfiles:
             base_dof_name += [f'base{i}_x', f'base{i}_y']
             res_dof_name += [f'res{i}_x', f'res{i}_y']
 
-        #if 'linear_results' not in res.__dict__:
-        res.linear_results = r.calc_frf(sp_arr=res.fl,
-                            f=np.ones(len(res.fl)),
-                            probe_dof=last_dof + base_dof + res_dof,
-                            probe_names=last_dof_name + base_dof_name + res_dof_name,
-                            f_node=0,
-                            silent=False,
-                            rotor_solo=False)
+        if 'linear_results' not in res.__dict__:
+            res.linear_results = r.calc_frf(sp_arr=res.fl,
+                                f=np.ones(len(res.fl)),
+                                probe_dof=last_dof + base_dof + res_dof,
+                                probe_names=last_dof_name + base_dof_name + res_dof_name,
+                                f_node=0,
+                                silent=False,
+                                rotor_solo=False)
+            update = True
 
-        #if 'rigid_results' not in res.__dict__:
-        res.rigid_results = r.calc_frf(sp_arr=res.fl,
-                            f=np.ones(len(res.fl)),
-                            probe_dof=last_dof,
-                            probe_names=last_dof_name,
-                            f_node=0,
-                            silent=False,
-                            rotor_solo=True)
-        
-    with open(f, 'wb') as file:
-        dump(res, file)
+        if 'rigid_results' not in res.__dict__:
+            res.rigid_results = r.calc_frf(sp_arr=res.fl,
+                                f=np.ones(len(res.fl)),
+                                probe_dof=last_dof,
+                                probe_names=last_dof_name,
+                                f_node=0,
+                                silent=False,
+                                rotor_solo=True)
+            update = True
+            
+    if update:    
+        with open(f, 'wb') as file:
+            dump(res, file)
 
     

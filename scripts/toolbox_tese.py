@@ -37,15 +37,10 @@ def plot_frf_set(force_type,
     
     if type(dof) != list:
         dof = [dof]
-    
-    if force_type == 'backward':
-        k = 1
-    else:
-        k = 0
-          
+              
     filename_base = f'{mod}results_{tun}_{force_type}'
 
-    picfiles = [f for f in listdir(getcwd()) if (isfile(join(getcwd(), f)) and '.pic' in f and filename_base in f and all([str(s) not in f for s in remove_list]))]
+    picfiles = [f for f in listdir(getcwd()) if (isfile(join(getcwd(), f)) and '.pic' in f and f.startswith(filename_base) and all([str(s) not in f for s in remove_list]))]
     print(picfiles)
     
     f0 = []
@@ -93,7 +88,7 @@ def plot_frf_set(force_type,
             if 'linear_results' in res.__dict__:
                 fig_lin = res.linear_results.plot_frf(dof=dof,
                                                         whirl=force_type,
-                                                        amplitude_units=amplitude_units)[k]
+                                                        amplitude_units=amplitude_units)
                 fig_lin.data[0].line.color = 'blue'
                 fig_lin.data[0].y = fig_lin.data[0].y / corr1
                 fig_lin.data[0].name = 'Linear Resonators'
@@ -101,7 +96,7 @@ def plot_frf_set(force_type,
             if 'rigid_results' in res.__dict__:
                 fig_rig = res.rigid_results.plot_frf(dof=dof,
                                                     whirl=force_type,
-                                                    amplitude_units=amplitude_units)[k]
+                                                    amplitude_units=amplitude_units)
                 fig_rig.data[0].line.color = 'black'
                 fig_rig.data[0].line.dash = 'dash'
                 fig_rig.data[0].y = fig_rig.data[0].y / corr1
@@ -126,7 +121,8 @@ def plot_frf_set(force_type,
         else:
             fig.add_trace(fig_aux.data[0])
 
-    fig.update_layout(yaxis_title=amp_units)
+    fig.update_layout(yaxis_title=amp_units,
+                          width=900)
     if 'unb' in force_type:
         fig.update_layout(title_text='Unbalance Response')
     elif 'for' in force_type:
