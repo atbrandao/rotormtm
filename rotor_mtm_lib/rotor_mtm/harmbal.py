@@ -7,7 +7,7 @@ from pickle import dump
 import subprocess
 import pandas as pd
 import os
-from .results import IntegrationResults
+from .results import IntegrationResults, LinearResults
 from copy import deepcopy
 
 class Sys_NL:
@@ -279,6 +279,59 @@ class Sys_NL:
             z0[2 * self.ndof + 2 * (self.nu - 1) * self.ndof + i] = np.real(y)
 
         return z0.reshape(len(z0))
+    
+    def calc_linear_frf(self,
+                        sp_arr,
+                        f=None,
+                        probe_dof=None,
+                        probe_names=None,
+                        f_node=0,
+                        rotor_solo=False,
+                        silent=True
+                        ):
+        
+        if self.rotor is not None:
+            res = self.rotor.calc_frf(sp_arr,
+                                        f,
+                                        probe_dof=None,
+                                        probe_names=None,
+                                        f_node=0,
+                                        rotor_solo=False,
+                                        silent=True)
+            return res
+        
+        else:
+
+            if probe_dof is None:
+                probe_dof = [a for a in range(self.ndof)]
+
+            if probe_names is None:
+                probe_names = [p for p in probe_dof]
+
+            if f is None:
+                f = np.ones(len(sp_arr))
+
+            res_fow = {p: np.zeros(len(sp_arr)).astype(complex) for p in probe_names}
+            res_back = {p: np.zeros(len(sp_arr)).astype(complex) for p in probe_names}
+            for i, omg in enumerate(sp_arr):
+
+                H = self.H(omg)
+
+                F = np.zeros((2 * self.ndof, 1)).astype(complex)
+                F[self.ndof + f_node] = 1
+                r = f[i] * H @ self.Minv @ F
+
+                for j, p in enumerate(probe_names):
+                    res_fow[p][i] = r[probe_dof[j], 0]
+                    res_back[p][i] = r[probe_dof[j], 0]
+
+                if not silent:
+                    print(f'Linear response calculated for frequency: {omg:.1f} rad/s')
+
+            return LinearResults(sp_arr,
+                                res_fow,
+                                res_back,
+                                self)
 
     def solve_hb(self, f, omg, z0=None, full_output=False, method=None, state_space=False, plot_orbit=False):
 
