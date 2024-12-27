@@ -25,6 +25,125 @@ def get_results(f,
            
     return res
 
+def plot_frf_sensitivity(force_type,
+                         mod,
+                         f0,
+                         var=False,
+                         tun='transtun',
+                         amplitude_units='rms',
+                         unbalance_speed=377,
+                         dof=['last_x'],
+                         param='w0',
+                         arr=[300, 310, 320, 330],                         
+                         plot_linear=True,
+                         plot_rigid=True
+                         ):
+    
+    if type(dof) != list:
+        dof = [dof]
+    
+    if var:
+        var_str = 'var'
+    else:
+        var_str = ''
+
+    if param == 'w0':          
+        filename_base = f'{mod}results_{tun}PARAM{var_str}_{force_type}_f{f0}.pic'
+        
+    picfiles = [f for f in listdir(getcwd()) if (isfile(join(getcwd(), f)) and any(f.startswith(filename_base.replace('PARAM', str(a))) for a in arr))]
+    print(picfiles)
+    
+    fig = go.Figure()
+
+    for i, f in enumerate([filename_base.replace('PARAM', str(a)) for a in arr]):
+
+        if isfile(join(getcwd(), f)):
+
+            print(f)
+
+            with open(f, 'rb') as file:
+                res = load(file)
+            res = IntegrationResults.update_class_object(res)
+
+            if 'unb' in force_type:
+                if mod is None:
+                    mod = '05x0_'
+
+                unb_base = 6350 * res.system.rotor.rotor_solo_disks.m / (unbalance_speed * 60 / (2 * np.pi))
+                force_units = 'g-mm'
+                force_units_legend = 'U'
+                amp_units = f'micron ({amplitude_units}) / ' + force_units
+                corr1 = 1
+                corr2 = f0 * unb_base / 1e6
+                
+            else:
+                if mod is None:
+                    mod = '2x0_'
+
+                force_units = 'N'
+                force_units_legend = force_units
+                amp_units = f'm ({amplitude_units}) / ' + force_units
+                corr1 = 1
+                corr2 = f0
+            
+            fig_aux = res.plot_frf(dof=dof,
+                                    amplitude_units=amplitude_units)
+            name = f'{arr[i]} {param}'        
+            fig_aux.data[0].name = name
+            fig_aux.data[0].y = fig_aux.data[0].y / corr2
+
+            if i == 0:
+                if 'linear_results' in res.__dict__:
+                    fig_lin = res.linear_results.plot_frf(dof=dof,
+                                                            whirl=force_type,
+                                                            amplitude_units=amplitude_units)
+                    fig_lin.data[0].line.color = 'blue'
+                    fig_lin.data[0].y = fig_lin.data[0].y / corr1
+                    fig_lin.data[0].name = 'Linear'
+
+                if 'rigid_results' in res.__dict__:
+                    fig_rig = res.rigid_results.plot_frf(dof=dof,
+                                                        whirl=force_type,
+                                                        amplitude_units=amplitude_units)
+                    fig_rig.data[0].line.color = 'black'
+                    fig_rig.data[0].line.dash = 'dash'
+                    fig_rig.data[0].y = fig_rig.data[0].y / corr1
+                    fig_rig.data[0].name = 'Rigid Disks'
+                
+                if fig_lin and plot_linear:
+                    plot_linear = False
+                    fig = fig_lin
+
+                if fig_rig and plot_rigid:
+                    plot_rigid = False
+                    if len(fig.data) == 0:
+                        fig = fig_rig
+                    else:
+                        fig.add_trace(fig_rig.data[0])
+
+                if len(fig.data) == 0:
+                    fig = fig_aux
+                else:
+                    fig.add_trace(fig_aux.data[0])
+
+            else:
+                fig.add_trace(fig_aux.data[0])
+        else:
+            print(f'File {f} not found.')
+
+    fig.update_layout(yaxis_title=amp_units,
+                          width=900)
+    if 'unb' in force_type:
+        fig.update_layout(title_text='Unbalance Response')
+    elif 'for' in force_type:
+        fig.update_layout(title_text='Forward Excitation')
+    else:
+        fig.update_layout(title_text='Backward Excitation')
+
+    return fig
+    
+
+
 def plot_frf_set(force_type,
                  tun,
                  mod=None,
@@ -39,7 +158,7 @@ def plot_frf_set(force_type,
         dof = [dof]
               
     filename_base = f'{mod}results_{tun}_{force_type}'
-
+    
     picfiles = [f for f in listdir(getcwd()) if (isfile(join(getcwd(), f)) and '.pic' in f and f.startswith(filename_base) and all([str(s) not in f for s in remove_list]))]
     print(picfiles)
     
@@ -91,7 +210,7 @@ def plot_frf_set(force_type,
                                                         amplitude_units=amplitude_units)
                 fig_lin.data[0].line.color = 'blue'
                 fig_lin.data[0].y = fig_lin.data[0].y / corr1
-                fig_lin.data[0].name = 'Linear Resonators'
+                fig_lin.data[0].name = 'Linear'
 
             if 'rigid_results' in res.__dict__:
                 fig_rig = res.rigid_results.plot_frf(dof=dof,
@@ -100,7 +219,7 @@ def plot_frf_set(force_type,
                 fig_rig.data[0].line.color = 'black'
                 fig_rig.data[0].line.dash = 'dash'
                 fig_rig.data[0].y = fig_rig.data[0].y / corr1
-                fig_rig.data[0].name = 'Bare Rotor'
+                fig_rig.data[0].name = 'Rigid Disks'
             
             if fig_lin and plot_linear:
                 plot_linear = False

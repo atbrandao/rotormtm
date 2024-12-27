@@ -40,7 +40,7 @@ for f in picfiles:
             base_dof_name += [f'base{i}_x', f'base{i}_y']
             res_dof_name += [f'res{i}_x', f'res{i}_y']
 
-        if 'linear_results' not in res.__dict__:
+        if 'linear_results' not in res.__dict__ or res.linear_results is None:
             res.linear_results = r.calc_frf(sp_arr=res.fl,
                                 f=np.ones(len(res.fl)),
                                 probe_dof=last_dof + base_dof + res_dof,
@@ -50,7 +50,7 @@ for f in picfiles:
                                 rotor_solo=False)
             update = True
 
-        if 'rigid_results' not in res.__dict__:
+        if 'rigid_results' not in res.__dict__ or res.rigid_results is None:
             res.rigid_results = r.calc_frf(sp_arr=res.fl,
                                 f=np.ones(len(res.fl)),
                                 probe_dof=last_dof,
