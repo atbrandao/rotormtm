@@ -371,7 +371,7 @@ class RotorMTM:
             probe_dof = [a for a in range(self.N)]
 
         if probe_names is None:
-            probe_names = [str(p) for p in probe_dof]
+            probe_names = [p for p in probe_dof]
 
         res_fow = {p: np.zeros(len(sp_arr)).astype(complex) for p in probe_names}
         res_back = {p: np.zeros(len(sp_arr)).astype(complex) for p in probe_names}
@@ -633,7 +633,7 @@ def plot_diff_modal(w, diff, sp_arr, mode='abs',n_plot=None,saturate=None, color
                                y=w[a], mode='markers',
                                text=[f'{a} {i}' for i in range(len(w[a]))],
                                marker={'color': (np.mean(np.abs(diff[a]), 1)),
-                                        'colorscale':["blue", "purple", "yellow"],
+                                        'colorscale':"Plasma", # ["blue", "purple", "yellow"],
                                        'colorbar': dict(title=(['Amplific.'+leg_add] + [None] * (len(sp_arr) - 1))[a],
                                                         x=([x0] + [None] * (len(sp_arr) - 1))[a],),
                                        'size': 3,
@@ -652,7 +652,7 @@ def plot_diff_modal(w, diff, sp_arr, mode='abs',n_plot=None,saturate=None, color
                                z=w[a], mode='markers',
                                text=(np.abs(diff[a])[:,n]),
                                marker={'color': (np.abs(diff[a])[:,n]),
-                                        'colorscale':["blue", "purple", "yellow"],
+                                        'colorscale':"Plasma", # ["blue", "purple", "yellow"],
                                        'colorbar': dict(title=colorbar[a]),
                                        'size': 3,
                                         'cmin': 0, #np.log10(np.min(np.abs(diff))),
@@ -660,16 +660,19 @@ def plot_diff_modal(w, diff, sp_arr, mode='abs',n_plot=None,saturate=None, color
                                        },
                                showlegend=False) for a in range(len(sp_arr))]
     if mode == 'phase':
+        z = [np.mean(np.angle(diff[a]), 1) * 180 / np.pi for a in range(len(sp_arr))]
+        z[z < 0] += 360
+
         if n_plot is None:
             data = [go.Scatter(x=[sp_arr[a]] * len(w),
                                y=w[a], mode='markers',
                                text=[f'{a} {i}' for i in range(len(w[a]))],
-                               marker={'color': (np.mean(np.angle(diff[a]), 1)),
+                               marker={'color': z[a],
                                        'colorscale':'Phase',
-                                       'colorbar': dict(title=(['Phase (rad)'] + [None] * (len(sp_arr) - 1))[a],),
+                                       'colorbar': dict(title=(['Phase [deg]'] + [None] * (len(sp_arr) - 1))[a],),
                                        'size': 3,
                                        'cmin': 0,
-                                       'cmax': np.pi
+                                       'cmax': 360
                                        },
                                showlegend=False) for a in range(len(sp_arr))]
             
@@ -683,12 +686,12 @@ def plot_diff_modal(w, diff, sp_arr, mode='abs',n_plot=None,saturate=None, color
                 data += [go.Scatter3d(y=[n] * len(w), x=[sp_arr[a]] * len(w),
                                z=w[a], mode='markers',
                                text=np.angle(diff[a])[:,n],
-                               marker={'color': np.angle(diff[a])[:,n],
-                                        'colorscale':["blue", "purple", "yellow"],
+                               marker={'color': np.angle(diff[a])[:, n] * 180 / np.pi,
+                                        'colorscale': "Phase", #["blue", "purple", "yellow"],
                                        'colorbar': dict(title=colorbar[a]),
                                        'size': 3,
                                         'cmin': 0,
-                                        'cmax': np.pi
+                                        'cmax': 360
                                        },
                                showlegend=False) for a in range(len(sp_arr))]
                 
@@ -747,7 +750,7 @@ def plot_diff_modal(w, diff, sp_arr, mode='abs',n_plot=None,saturate=None, color
     return fig
 
 def plot_camp_heatmap(r, w, sp_arr, w_res=None, colorbar_title='Response (log)',
-                      saturate_min=None,f_min=None):
+                      saturate_min=None,f_min=None, phase_angle=False):
 
     w_max = sp_arr[-1]
     w_min = sp_arr[0]
@@ -756,6 +759,11 @@ def plot_camp_heatmap(r, w, sp_arr, w_res=None, colorbar_title='Response (log)',
         i_min = 0
     else:
         i_min = np.argmin(np.abs(sp_arr-f_min))
+
+    if phase_angle:
+        colorscale = 'Phase'
+    else:
+        colorscale = 'Plasma'
 
     if w_res != None:
         data_res = [go.Scatter(x=[sp_arr[a] for a in range(len(sp_arr)) if len(w_res[a]) > b],
@@ -768,7 +776,9 @@ def plot_camp_heatmap(r, w, sp_arr, w_res=None, colorbar_title='Response (log)',
                               name='Resonator frequencies')]
     else:
         data_res = []
-    data = [go.Heatmap(x=sp_arr, y=sp_arr[i_min:], z=r[i_min:,:], colorbar=dict(title=colorbar_title),
+    data = [go.Heatmap(x=sp_arr, y=sp_arr[i_min:], z=r[i_min:,:], 
+                       colorbar=dict(title=colorbar_title),
+                       colorscale=colorscale,
                       zmin=saturate_min,zmax=np.max(r)),
             go.Scatter(x=[0, w_max], y=[0, w_max], mode='lines', line={'dash': 'dash', 'color': 'black'},
                        name='Synch. Frequency',showlegend=True)]
@@ -908,7 +918,7 @@ def res_diff(x, n_pos, cross_prod=False, energy=False):
     else:
         x2 = x[len(x) - len(n_pos):]
         diff = x2 / x1
-        diff = (np.real(diff)) + 1.j * np.abs(np.imag(diff))
+        # diff = (np.real(diff)) + 1.j * np.abs(np.imag(diff))
         diff = np.delete(diff, [7])
 
     return diff

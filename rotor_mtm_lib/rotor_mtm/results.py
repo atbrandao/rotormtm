@@ -28,12 +28,18 @@ class IntegrationResults():
 
     @classmethod
     def update_class_object(cls, obj):
-        
-        return cls(frequency_list=obj.fl,
+
+        aux = cls(frequency_list=obj.fl,
                  data_dict_list=obj.ddl,
                  system=obj.system,
                  linear_results=obj.linear_results,
                  rigid_results=obj.rigid_results)
+        
+        for k in obj.__dict__:
+            if k not in aux.__dict__:
+                aux.__dict__[k] = obj.__dict__[k]
+        
+        return aux
 
     @staticmethod
     def poincare_section(x,
@@ -71,12 +77,17 @@ class IntegrationResults():
         return i
 
     @staticmethod
-    def _adjust_plot(fig):
+    def _adjust_plot(fig,
+                     font_size=24,
+                     maintain_proportions=False):
 
-        fig.update_layout(width=800,
-                          height=700,
-                          font=dict(family="Calibri, bold",
-                                    size=18),
+        if not maintain_proportions:
+            fig.update_layout(width=800,
+                              height=700)
+
+
+        fig.update_layout(font=dict(family="Calibri, bold",
+                                    size=font_size),
                           yaxis={"gridcolor": "rgb(159, 197, 232)",
                                 "zerolinecolor": "rgb(74, 134, 232)",
                                 },
@@ -260,9 +271,13 @@ class IntegrationResults():
             fig.add_trace(go.Scatter(x=omg_bif,
                                      y=bif_data_dict[k],
                                      mode='markers',
+                                     marker=dict(size=4),
                                      name=k,
                                      )
                           )
+        if len(fig.data) == 1:
+            fig.data[0].marker.color = 'black'
+
         fig.update_yaxes(title='Displacement [m]')
         fig.update_xaxes(title='Excitation Frequency [rad/s]',
                          range=[np.min(self.fl), np.max(self.fl)])
@@ -394,12 +409,80 @@ class IntegrationResults():
         fig = self._adjust_plot(fig)
 
         return fig
+    
+    def _calc_velocity(self, x, t):
+
+        v = 0 * x
+
+        v[0] = (x[1] - x[0]) / (t[1] - t[0])
+        v[-1] = (x[-1] - x[-2]) / (t[-1] - t[-2])
+
+        for i in range(1, len(x) - 1):
+            v_aux = (x[i + 1] - x[i]) / (t[i + 1] - t[i])
+            v[i] = (v[i - 1] + v_aux) / 2
+
+        return v
 
 
-    # def plot_state_space(self,
-    #                      dof,
-    #                      frequency):
-    #
+    def plot_poincare_section(self,
+                            frequency,
+                            dof=None,
+                            cut=1):
+
+        fig = go.Figure()
+
+        i = self._find_frequency_index(frequency)
+        d = self.ddl[i]
+        t = d['time']
+        k = list(d.keys())
+
+        if dof is None:
+            dof = [k[0]]
+
+        for j, dof_i in enumerate(dof):
+            if not isinstance(dof_i, tuple):
+                v = self._calc_velocity(d[dof_i], t)
+                dof[j] = (dof_i, str(dof_i) + '_vel')
+                d[dof[j][1]] = v
+
+        n_cut = int(len(d[dof[0][0]]) / cut)
+        t_cut = t[:n_cut]
+
+        T = 2 * np.pi / self.fl[i]
+        t_pc = np.arange(0, t_cut[-1], T)
+
+        max_amp_x = 0
+        max_amp_y = 0
+        for i in dof:           
+
+            x = np.interp(t_pc, t_cut, d[i[0]][-n_cut:])
+            y = np.interp(t_pc, t_cut, d[i[1]][-n_cut:])
+
+            fig.add_trace(go.Scatter(x=x,
+                                     y=y,
+                                     mode='markers',
+                                     marker=dict(color='black',
+                                                 size=4),
+                                     name=f'{i[0]} vs {i[1]}',
+                                     showlegend=True,
+                                     legendgroup=f'{i[0]}'
+                                     )
+                          )
+
+            if np.max(x) > max_amp_x:
+                max_amp_x = np.max(x)
+            if np.max(y) > max_amp_y:
+                max_amp_y = np.max(y)
+
+        fig.update_layout(title=f'Poincaré Section',
+                        #   xaxis_range=[- 1.1 * max_amp_x, 1.1 * max_amp_x],
+                        #   yaxis_range=[- 1.1 * max_amp_y, 1.1 * max_amp_y],
+                          xaxis_title=f'X [m]',
+                          yaxis_title=f'Y [m]',
+                          )
+        fig = self._adjust_plot(fig)
+
+        return fig
 
     def plot_spectrum(self,
                       dof,
@@ -549,7 +632,7 @@ class IntegrationResults():
             xaxis_range=freq_range,
             yaxis_range=[np.min(self.fl), np.max(self.fl)],
             xaxis_title='Response Frequency [rad/s]',
-            yaxis_title='Rotating Speed [rad/s]',
+            yaxis_title='Excitation Frequency [rad/s]',
             legend=dict(orientation='h',
                         xanchor='center',
                         x=0.5,
@@ -616,7 +699,7 @@ class IntegrationResults():
                 xaxis=dict(range=freq_range,
                            title='Response Frequency [rad/s]'),
                 yaxis=dict(range=[np.min(self.fl), np.max(self.fl)],
-                           title='Rotating Speed [rad/s]'),
+                           title='Excitation Frequency [rad/s]'),
                 zaxis=dict(title='Amplitude [m]'),
             ),
         )
@@ -672,6 +755,7 @@ class IntegrationResults():
                       dof,
                       dof_y=None,
                       mode='amp',
+                      min_freq=None,
                       max_freq=None,
                       max_amp=None,
                       full_spectrum=False,
@@ -715,11 +799,10 @@ class IntegrationResults():
                 aux += aux2
 
             aux = aux / len(dof)
-                # if aux is None:
-                #     aux = aux2
-                # else:
-                #     aux = (aux + aux2) / 2
-
+            if min_freq is not None:
+                for k, omg in enumerate(w):
+                    if np.abs(omg) < min_freq:
+                        aux[k] = np.nan
 
             if z is None:
                 z = np.zeros((len(self.fl), len(aux))).astype(complex)
@@ -761,7 +844,7 @@ class IntegrationResults():
             #         xaxis=dict(range=freq_range,
             #                    title='Response Frequency [rad/s]'),
             #         yaxis=dict(range=[np.min(self.fl), np.max(self.fl)],
-            #                    title='Rotating Speed [rad/s]'),
+            #                    title='Excitation Frequency [rad/s]'),
             #         zaxis=dict(title='Amplification [m]'),
             #     ),
             # )
@@ -819,7 +902,7 @@ class IntegrationResults():
             xaxis_range=freq_range,
             yaxis_range=[np.min(self.fl), np.max(self.fl)],
             xaxis_title='Response Frequency [rad/s]',
-            yaxis_title='Rotating Speed [rad/s]',
+            yaxis_title='Excitation Frequency [rad/s]',
             legend=dict(orientation='h',
                         xanchor='center',
                         x=0.5,
@@ -878,13 +961,13 @@ class LinearResults():
                  whirl='both',
                  amplitude_units='rms'):
 
-        fig_f = go.Figure()
-        fig_b = go.Figure()
+        fig_1 = go.Figure()
+        fig_2 = go.Figure()
         if dof is None:
             dof = [j for j in self.rf.keys()]
         if whirl == 'both':
             dl = [self.rf, self.rb]
-        elif whirl == 'forward' or 'unbalance':
+        elif whirl == 'forward' or whirl == 'unbalance':
             dl = [self.rf]
         elif whirl == 'backward':
             dl = [self.rb]
@@ -907,33 +990,36 @@ class LinearResults():
 
         for i, p in enumerate(dof):
            
-            fig_f.add_trace(go.Scatter(x=self.fl, y=amp[i, :, 0], name=f'DoF: {p}'))
+            fig_1.add_trace(go.Scatter(x=self.fl, y=amp[i, :, 0], name=f'DoF: {p}'))
             if 'unb' in whirl:
-                fig_f.data[-1].y = fig_f.data[-1].y * self.fl ** 2
-                
+                fig_1.data[-1].y = fig_1.data[-1].y * self.fl ** 2
+
         if amp.shape[2] == 2:
             for i, p in enumerate(dof):
-                fig_b.add_trace(go.Scatter(x=self.fl, y=amp[i, :, 1], name=f'DoF: {p}'))
+                fig_2.add_trace(go.Scatter(x=self.fl, y=amp[i, :, 1], name=f'DoF: {p}'))
 
-        fig_f.update_layout(
+        fig_1.update_layout(
             xaxis={'range': [0, np.max(self.fl)],
                    },
             xaxis_title='Frequency [rad/s]',
             yaxis_title='Amplitude [m RMS]',
             title='Forward Excitation'
         )
-        fig_f.update_yaxes(type="log")
+        fig_1.update_yaxes(type="log")
 
-        fig_b.update_layout(
+        fig_2.update_layout(
             xaxis={'range': [0, np.max(self.fl)],
                    },
             xaxis_title='Frequency [rad/s]',
             yaxis_title='Amplitude [m RMS]',
             title='Backward Excitation'
         )
-        fig_b.update_yaxes(type="log")
+        fig_2.update_yaxes(type="log")
 
-        fig_f = IntegrationResults._adjust_plot(fig_f)
-        fig_b = IntegrationResults._adjust_plot(fig_b)
+        fig_1 = IntegrationResults._adjust_plot(fig_1)
+        fig_2 = IntegrationResults._adjust_plot(fig_2)
 
-        return fig_f, fig_b
+        if whirl == 'both':
+            return fig_1, fig_2
+        else:
+            return fig_1
