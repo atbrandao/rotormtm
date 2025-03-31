@@ -173,6 +173,7 @@ class IntegrationResults():
                             hanning=True,
                             synch_freq=None,
                             return_complex=False,
+                            backward_vector=False
                             ):
 
         w, spec_x = self._calc_fourier(t=t,
@@ -188,8 +189,10 @@ class IntegrationResults():
                                        synch_freq=synch_freq,
                                        return_complex=True)
 
-        fow = 1 / 2 * (spec_x + 1.j * spec_y)
-        back = 1 / 2 * (np.conj(spec_x) + 1.j * np.conj(spec_y))
+        fow = (spec_x + 1.j * spec_y) / 2
+        back = (spec_x - 1.j * spec_y) / 2
+        if backward_vector:
+            back = np.conj(back)
 
         w = np.concatenate([- w[-1::-1], np.zeros(1), w])
         spectrum = np.concatenate([back[-1::-1], np.zeros(1), fow])
@@ -712,7 +715,9 @@ class IntegrationResults():
                    y=None,
                    cut=2,
                    hanning=True,
-                   synch_freq=None):
+                   synch_freq=None,
+                   backward_vector=False,
+                   full_output=False):
 
         if y is not None:
             w, spec_1 = self._calc_full_spectrum(t=t,
@@ -721,7 +726,8 @@ class IntegrationResults():
                                              cut=cut,
                                              hanning=hanning,
                                              synch_freq=synch_freq,
-                                             return_complex=True)
+                                             return_complex=True,
+                                             backward_vector=backward_vector)
 
             _, spec_2 = self._calc_full_spectrum(t=t,
                                                  x=x[1],
@@ -729,7 +735,8 @@ class IntegrationResults():
                                                  cut=cut,
                                                  hanning=hanning,
                                                  synch_freq=synch_freq,
-                                                 return_complex=True)
+                                                 return_complex=True,
+                                                 backward_vector=backward_vector)
         else:
             w, spec_1 = self._calc_fourier(t=t,
                                         x=x[0],
@@ -749,7 +756,10 @@ class IntegrationResults():
         # diff = np.zeros(spec_1.shape).astype(complex)
         # diff[spec_2.nonzero()] = spec_1[spec_2.nonzero()] / spec_2[spec_2.nonzero()]
 
-        return w, diff
+        if full_output:
+            return w, diff, spec_1, spec_2
+        else:
+            return w, diff
 
     def plot_diff_map(self,
                       dof,
@@ -761,7 +771,9 @@ class IntegrationResults():
                       full_spectrum=False,
                       hanning=False,
                       cut=2,
-                      log_mode=False):
+                      log_mode=False,
+                      backward_vector=False,
+                      plot_3d=False):
 
         fig = go.Figure()
         t = self.ddl[0]['time']
@@ -774,30 +786,46 @@ class IntegrationResults():
             aux = 0
             for j, dof_i in enumerate(dof):
                 if full_spectrum:
-                    w, aux2 = self._calc_diff(t=t,
-                                              x=(
-                                                  np.interp(t, d['time'], d[dof_i[0]]),
-                                                  np.interp(t, d['time'], d[dof_i[1]])
-                                              ),
-                                              y=(
-                                                  np.interp(t, d['time'], d[dof_y[j][0]]),
-                                                  np.interp(t, d['time'], d[dof_y[j][1]])
-                                              ),
-                                              hanning=hanning,
-                                              cut=cut
-                                              )
+                    w, aux2, spec_1, spec_2 = self._calc_diff(
+                        t=t,
+                        x=(
+                            np.interp(t, d['time'], d[dof_i[0]]),
+                            np.interp(t, d['time'], d[dof_i[1]])
+                        ),
+                        y=(
+                            np.interp(t, d['time'], d[dof_y[j][0]]),
+                            np.interp(t, d['time'], d[dof_y[j][1]])
+                        ),
+                        hanning=hanning,
+                        cut=cut,
+                        backward_vector=backward_vector,
+                        full_output=True
+                    )
+                    
                 else:
-                    w, aux2 = self._calc_diff(t=t,
-                                             x=(
-                                                 np.interp(t, d['time'], d[dof_i[0]]),
-                                                 np.interp(t, d['time'], d[dof_i[1]])
-                                             ),
-                                             hanning=hanning,
-                                             cut=cut
-                                             )
+                    w, aux2, spec_1, spec_2 = self._calc_diff(
+                        t=t,
+                        x=(
+                            np.interp(t, d['time'], d[dof_i[0]]),
+                            np.interp(t, d['time'], d[dof_i[1]])
+                        ),
+                        hanning=hanning,
+                        cut=cut,
+                        full_output=True
+                    )
 
-                aux += aux2
+                if mode == 'amp':
+                    aux += np.abs(aux2)
 
+                elif mode == 'angle':
+                    aux += np.angle(aux2) * 180 / (np.pi)
+
+                elif mode == 'composition':
+                    aux += np.abs(spec_1 - spec_2) * np.sin(np.angle(aux2)) * np.abs(w)
+                    # aux2 = aux2 * np.abs(spec_2)
+                    # aux3 = - 1.j * np.abs(w)
+                    # aux += np.real(aux2) * np.real(aux3) + np.imag(aux2) * np.imag(aux3)
+            
             aux = aux / len(dof)
             if min_freq is not None:
                 for k, omg in enumerate(w):
@@ -805,7 +833,7 @@ class IntegrationResults():
                         aux[k] = np.nan
 
             if z is None:
-                z = np.zeros((len(self.fl), len(aux))).astype(complex)
+                z = np.zeros((len(self.fl), len(aux)))#.astype(complex)
 
             z[i, :] = aux
 
@@ -817,102 +845,124 @@ class IntegrationResults():
         else:
             freq_range = [0, max_freq]
 
-        if mode == 'amp':
+        if mode == 'amp' or mode == 'composition':
             if log_mode:
                 z = np.log10(np.abs(z))
-                zmin = np.min(z)
+                zmin = np.min(z[np.isnan(z) == False])
                 zmax = 10
+                legend_text = ' [log]'
             else:
-                z = np.abs(z)
-                zmin = np.min(z)
-                zmax = np.max(z)
+                zmin = np.min(z[np.isnan(z) == False])
+                zmax = np.max(z[np.isnan(z) == False])
+                legend_text = ''
 
-            colorbar = dict(title='Amplification [log]')
+            if mode == 'composition':
+                zmin = - np.max(np.abs(z[np.isnan(z) == False]))
+                zmax = np.max(np.abs(z[np.isnan(z) == False]))
+
+            colorbar = dict(title=f'Amplification{legend_text}')
             colorscale = 'Plasma'
-            # for i, f in enumerate(self.fl):
-            #     fig.add_trace(go.Scatter3d(x=w,
-            #                                y=[f] * len(w),
-            #                                z=z[i, :],
-            #                                showlegend=False,
-            #                                mode='lines',
-            #                                line=dict(color='blue')))
-            #
-            # fig = self._adjust_plot3d(fig)
-            #
-            # fig.update_layout(
-            #     scene=dict(
-            #         xaxis=dict(range=freq_range,
-            #                    title='Response Frequency [rad/s]'),
-            #         yaxis=dict(range=[np.min(self.fl), np.max(self.fl)],
-            #                    title='Excitation Frequency [rad/s]'),
-            #         zaxis=dict(title='Amplification [m]'),
-            #     ),
-            # )
+            
 
         elif mode == 'angle':
-            z = np.angle(z) * 180 / (np.pi)
-            zmin = 0
-            zmax = 360
-            # z[-1, -1] = 0
-            z[z < 0] += 360
+            zmin = -180
+            zmax = 180
+
             colorbar = dict(title='Phase angle [deg]',
-                            tickvals=[0, 90, 180, 270, 360],
-                            ticktext=["0", "90", "180", "270", "360"],)
+                            tickvals=[-180, -90, 0, 90, 180],
+                            ticktext=["-180", "-90", "0", "90", "180"],)
+                            # tickvals=[0, 90, 180, 270, 360],
+                            # ticktext=["0", "90", "180", "270", "360"],)
             colorscale = 'Phase'
         # else:
         #     print('WARNING: mode must be either amp or angle. Plot will show amplification.')
 
-        fig.add_trace(go.Heatmap(y=self.fl,
-                                 x=w,
-                                 z=z,
-                                 colorbar=colorbar,
-                                 colorscale=colorscale,
-                                 zmin=zmin,
-                                 zmax=zmax
-                                 )
-                      )
+        if plot_3d:
+            for i, f in enumerate(self.fl):
+                d = self.ddl[i]
+                
 
-        fig.add_trace(go.Scatter(x=[0, np.max(self.fl)],
-                                 y=[0, np.max(self.fl)],
-                                 mode='lines',
-                                 name='Synchronous line',
-                                 legendgroup='synch',
-                                 line=dict(dash='dot',
-                                           color='black',
-                                           width=1),
-                                 showlegend=True
-                                 )
-                      )
-        if full_spectrum:
-            fig.add_trace(go.Scatter(x=[0, - np.max(self.fl)],
-                                     y=[0, np.max(self.fl)],
-                                     mode='lines',
-                                     name='Synchronous line',
-                                     legendgroup='synch',
-                                     line=dict(dash='dot',
-                                               color='black',
-                                               width=1),
-                                     showlegend=False
-                                     )
-                          )
+                fig.add_trace(go.Scatter3d(x=w,
+                                        y=[f] * len(w),
+                                        z=z[i, :],
+                                        showlegend=False,
+                                        mode='lines',
+                                        line=dict(color='blue')))
 
-        fig = self._adjust_plot(fig)
+            if max_freq is None:
+                max_freq = np.max(w)
 
-        fig.update_layout(
-            xaxis_range=freq_range,
-            yaxis_range=[np.min(self.fl), np.max(self.fl)],
-            xaxis_title='Response Frequency [rad/s]',
-            yaxis_title='Excitation Frequency [rad/s]',
-            legend=dict(orientation='h',
-                        xanchor='center',
-                        x=0.5,
-                        yanchor='bottom',
-                        y=1.05),
-            width=900,
-            height=700
-        )
+            fig = self._adjust_plot3d(fig)
+
+            if full_spectrum:
+                freq_range = [- max_freq, max_freq]
+            else:
+                freq_range = [0, max_freq]
+
+            fig.update_layout(
+                scene=dict(
+                    xaxis=dict(range=freq_range,
+                            title='Response Frequency [rad/s]'),
+                    yaxis=dict(range=[np.min(self.fl), np.max(self.fl)],
+                            title='Excitation Frequency [rad/s]'),
+                    zaxis=dict(title='Amplitude [m]'),
+                ),
+            )
+
+        else:
+            fig.add_trace(go.Heatmap(y=self.fl,
+                                    x=w,
+                                    z=z,
+                                    colorbar=colorbar,
+                                    colorscale=colorscale,
+                                    zmin=zmin,
+                                    zmax=zmax
+                                    )
+                        )
+
+            fig.add_trace(go.Scatter(x=[0, np.max(self.fl)],
+                                    y=[0, np.max(self.fl)],
+                                    mode='lines',
+                                    name='Synchronous line',
+                                    legendgroup='synch',
+                                    line=dict(dash='dot',
+                                            color='black',
+                                            width=1),
+                                    showlegend=True
+                                    )
+                        )
+            if full_spectrum:
+                fig.add_trace(go.Scatter(x=[0, - np.max(self.fl)],
+                                        y=[0, np.max(self.fl)],
+                                        mode='lines',
+                                        name='Synchronous line',
+                                        legendgroup='synch',
+                                        line=dict(dash='dot',
+                                                color='black',
+                                                width=1),
+                                        showlegend=False
+                                        )
+                            )
+
+            fig = self._adjust_plot(fig)
+
+            fig.update_layout(
+                xaxis_range=freq_range,
+                yaxis_range=[np.min(self.fl), np.max(self.fl)],
+                xaxis_title='Response Frequency [rad/s]',
+                yaxis_title='Excitation Frequency [rad/s]',
+                legend=dict(orientation='h',
+                            xanchor='center',
+                            x=0.5,
+                            yanchor='bottom',
+                            y=1.05),
+                width=900,
+                height=700
+            )
 
         return fig
+    
+    
 
 
 class LinearResults():

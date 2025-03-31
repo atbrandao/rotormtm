@@ -394,7 +394,8 @@ class RotorMTM:
                              self)
 
     def run_analysis(self, sp_arr, n_modes=50, dof=0, dof_show=0, diff_lim=5, unb_node=0, probe_node=None,
-                     heatmap=False, diff_analysis=False, cross_prod=False, energy=False, silent=False):
+                     heatmap=False, diff_analysis=False, cross_prod=False, energy=False, silent=False,
+                     backward_vector=False):
 
         prog_bar_width = 40
         i_prog = 0
@@ -413,6 +414,8 @@ class RotorMTM:
         ws = []
         w = []
         w_res = []
+        u = []
+        u_res = []
         diff = []
         diff_res = []
 
@@ -459,8 +462,9 @@ class RotorMTM:
                 Fs = Ms_inv @ Fs
                 ys = Hs @ Fs
                 fow = ys[dof_show + 4 * probe_node] / 2 + 1.j / 2 * ys[dof_show + 4 * probe_node + 1]
-                back = np.conj(ys[dof_show + 4 * probe_node]) / 2 + 1.j / 2 * np.conj(
-                    ys[dof_show + 4 * probe_node + 1])
+                back = ys[dof_show + 4 * probe_node] / 2 - 1.j / 2 * ys[dof_show + 4 * probe_node + 1]
+                if backward_vector:
+                    back = np.conj(back)
                 rsolo.append(np.abs(fow) + np.abs(back))
 
                 Fs_b = np.zeros((2 * N2, 1)).astype(complex)
@@ -469,8 +473,9 @@ class RotorMTM:
                 Fs_b = Ms_inv @ Fs_b
                 ys_b = Hs @ Fs_b
                 fow = ys_b[dof_show + 4 * probe_node] / 2 + 1.j / 2 * ys_b[dof_show + 4 * probe_node + 1]
-                back = np.conj(ys_b[dof_show + 4 * probe_node]) / 2 + 1.j / 2 * np.conj(
-                    ys_b[dof_show + 4 * probe_node + 1])
+                back = ys_b[dof_show + 4 * probe_node] / 2 - 1.j / 2 * ys_b[dof_show + 4 * probe_node + 1]
+                if backward_vector:
+                    back = np.conj(back)
                 rsolo_b.append(np.abs(fow) + np.abs(back))
 
                 F = np.zeros((2 * N, 1)).astype(complex)
@@ -483,7 +488,9 @@ class RotorMTM:
 
                 y = H @ (M_inv @ F)
                 fow = y[dof_show::4] / 2 + 1.j / 2 * y[dof_show + 1::4]
-                back = np.conj(y[dof_show::4]) / 2 + 1.j / 2 * np.conj(y[dof_show + 1::4])
+                back = y[dof_show::4] / 2 - 1.j / 2 * y[dof_show + 1::4]
+                if backward_vector:
+                    back = np.conj(back)
                 if energy:
                     r_diff.append(res_diff(y[dof_show::4], self.n_pos, cross_prod=cross_prod, energy=energy))
                 else:
@@ -492,7 +499,9 @@ class RotorMTM:
 
                 y_b = H @ (M_inv @ F_b)
                 fow = y_b[dof_show::4] / 2 + 1.j / 2 * y_b[dof_show + 1::4]
-                back = np.conj(y_b[dof_show::4]) / 2 + 1.j / 2 * np.conj(y_b[dof_show + 1::4])
+                back = y_b[dof_show::4] / 2 - 1.j / 2 * y_b[dof_show + 1::4]
+                if backward_vector:
+                    back = np.conj(back)
                 if energy:
                     r_diff_b.append(res_diff(y_b[dof_show::4], self.n_pos, cross_prod=cross_prod, energy=energy))
                 else:
@@ -504,6 +513,8 @@ class RotorMTM:
                                         cross_prod=cross_prod, energy=cross_prod)
                     w.append(aux[0])
                     w_res.append(aux[1])
+                    u.append(aux[2])
+                    u_res.append(aux[3])
                     diff.append(np.array(aux[6]))
                     diff_res.append(np.array(aux[7]))
 
@@ -532,6 +543,8 @@ class RotorMTM:
         out = dict(ws=ws,
                    w=w,
                    w_res=w_res,
+                   u=u,
+                   u_res=u_res,
                    sp_arr=sp_arr)
         if heatmap:
             out.update(dict(rsolo_map=np.array(rsolo_map).reshape((len(sp_arr), len(sp_arr))),
@@ -651,7 +664,7 @@ def plot_diff_modal(w, diff, sp_arr, mode='abs',n_plot=None,saturate=None, color
                 data += [go.Scatter3d(y=[n] * len(w), x=[sp_arr[a]] * len(w),
                                z=w[a], mode='markers',
                                text=(np.abs(diff[a])[:,n]),
-                               marker={'color': (np.abs(diff[a])[:,n]),
+                               marker={'color': (np.abs(diff[a])[:, n]),
                                         'colorscale':"Plasma", # ["blue", "purple", "yellow"],
                                        'colorbar': dict(title=colorbar[a]),
                                        'size': 3,
@@ -661,7 +674,8 @@ def plot_diff_modal(w, diff, sp_arr, mode='abs',n_plot=None,saturate=None, color
                                showlegend=False) for a in range(len(sp_arr))]
     if mode == 'phase':
         z = [np.mean(np.angle(diff[a]), 1) * 180 / np.pi for a in range(len(sp_arr))]
-        z[z < 0] += 360
+        z = np.array(z)
+        # z[z < 0] += 360
 
         if n_plot is None:
             data = [go.Scatter(x=[sp_arr[a]] * len(w),
@@ -671,8 +685,8 @@ def plot_diff_modal(w, diff, sp_arr, mode='abs',n_plot=None,saturate=None, color
                                        'colorscale':'Phase',
                                        'colorbar': dict(title=(['Phase [deg]'] + [None] * (len(sp_arr) - 1))[a],),
                                        'size': 3,
-                                       'cmin': 0,
-                                       'cmax': 360
+                                       'cmin': -180,
+                                       'cmax': 180
                                        },
                                showlegend=False) for a in range(len(sp_arr))]
             
@@ -690,8 +704,8 @@ def plot_diff_modal(w, diff, sp_arr, mode='abs',n_plot=None,saturate=None, color
                                         'colorscale': "Phase", #["blue", "purple", "yellow"],
                                        'colorbar': dict(title=colorbar[a]),
                                        'size': 3,
-                                        'cmin': 0,
-                                        'cmax': 360
+                                        'cmin': -180,
+                                        'cmax': 180
                                        },
                                showlegend=False) for a in range(len(sp_arr))]
                 
@@ -762,8 +776,12 @@ def plot_camp_heatmap(r, w, sp_arr, w_res=None, colorbar_title='Response (log)',
 
     if phase_angle:
         colorscale = 'Phase'
+        zmin = -180
+        zmax = 180
     else:
         colorscale = 'Plasma'
+        zmin = saturate_min
+        zmax = np.max(r)
 
     if w_res != None:
         data_res = [go.Scatter(x=[sp_arr[a] for a in range(len(sp_arr)) if len(w_res[a]) > b],
@@ -779,7 +797,7 @@ def plot_camp_heatmap(r, w, sp_arr, w_res=None, colorbar_title='Response (log)',
     data = [go.Heatmap(x=sp_arr, y=sp_arr[i_min:], z=r[i_min:,:], 
                        colorbar=dict(title=colorbar_title),
                        colorscale=colorscale,
-                      zmin=saturate_min,zmax=np.max(r)),
+                      zmin=zmin,zmax=zmax),
             go.Scatter(x=[0, w_max], y=[0, w_max], mode='lines', line={'dash': 'dash', 'color': 'black'},
                        name='Synch. Frequency',showlegend=True)]
 
@@ -919,7 +937,7 @@ def res_diff(x, n_pos, cross_prod=False, energy=False):
         x2 = x[len(x) - len(n_pos):]
         diff = x2 / x1
         # diff = (np.real(diff)) + 1.j * np.abs(np.imag(diff))
-        diff = np.delete(diff, [7])
+        # diff = np.delete(diff, [7])
 
     return diff
 
@@ -1039,7 +1057,7 @@ def plot_maj_ax(rotor, y, n_pos, dof, ys=None):
     maj_ax = np.zeros(N)
     for i in range(dof, rotor.ndof, 4):
         fow = y[i] / 2 + 1.j / 2 * y[i + 1]
-        back = np.conj(y[i]) / 2 + 1.j / 2 * np.conj(y[i + 1])
+        back = fow = y[i] / 2 - 1.j / 2 * y[i + 1]        
 
         maj_ax[i // 4] = np.abs(fow) + np.abs(back)
 
@@ -1060,7 +1078,7 @@ def plot_maj_ax(rotor, y, n_pos, dof, ys=None):
 
         for i in range(dof, 4 * N1, 4):
             fow = ys[i] / 2 + 1.j / 2 * ys[i + 1]
-            back = np.conj(ys[i]) / 2 + 1.j / 2 * np.conj(ys[i + 1])
+            back = ys[i] / 2 - 1.j / 2 * ys[i + 1]
 
             maj_ax2[i // 4] = np.abs(fow) + np.abs(back)
         data_solo.append(go.Scatter(x=l, y=maj_ax2,
