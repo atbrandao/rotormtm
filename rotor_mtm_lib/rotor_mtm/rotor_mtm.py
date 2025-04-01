@@ -570,6 +570,12 @@ class RotorMTM:
 
         return out
 
+    def ressonator_mass_ratio(self):
+
+        ratio = self.rotor_solo_disks.m / self._rotor.m - 1
+
+        return ratio
+
     def create_Sys_NL(self,
                       x_eq0=(None, None),
                       x_eq1=(None, None),
