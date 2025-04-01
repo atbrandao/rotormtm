@@ -291,13 +291,18 @@ class IntegrationResults():
     def plot_frf(self,
                  dof=None,
                  cut=2,
-                 amplitude_units='rms'):
+                 amplitude_units='rms',
+                 frequency_units='rad/s'):
 
         fig = go.Figure()
         if dof is None:
             dof = [j for j in self.ddl[0].keys() if j != 'time']
 
         rms = np.zeros((len(dof), len(self.fl)))
+
+        freq_convert = 1
+        if frequency_units.upper() == 'RPM':
+            freq_convert = 60 / (2 * np.pi)
 
         for i, f in enumerate(self.fl):
 
@@ -317,13 +322,13 @@ class IntegrationResults():
                                           amplitude_units=amplitude_units) for k in dof])
 
         for i, p in enumerate(dof):
-            fig.add_trace(go.Scatter(x=self.fl, y=rms[i, :], name=f'DoF: {p}'))
+            fig.add_trace(go.Scatter(x=self.fl * freq_convert, y=rms[i, :], name=f'DoF: {p}'))
 
         fig.update_layout(
                           xaxis={'range': [0, np.max(self.fl)],
                                  },
-                          xaxis_title='Frequency [rad/s]',
-                          yaxis_title='Amplitude [m RMS]',
+                          xaxis_title=f'Frequency [{frequency_units}]',
+                          yaxis_title=f'Amplitude [m {amplitude_units}]',
                           )
         fig.update_yaxes(type="log")
         fig = self._adjust_plot(fig)
