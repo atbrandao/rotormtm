@@ -1014,7 +1014,8 @@ class LinearResults():
     def plot_frf(self,
                  dof=None,
                  whirl='both',
-                 amplitude_units='rms'):
+                 amplitude_units='rms',
+                 frequency_units='rad/s'):
 
         fig_1 = go.Figure()
         fig_2 = go.Figure()
@@ -1026,6 +1027,10 @@ class LinearResults():
             dl = [self.rf]
         elif whirl == 'backward':
             dl = [self.rb]
+
+        freq_convert = 1
+        if frequency_units.upper() == 'RPM':
+            freq_convert = 60 / (2 * np.pi)
 
         amp = np.zeros((len(dof), len(self.fl), len(dl)))
 
@@ -1045,19 +1050,19 @@ class LinearResults():
 
         for i, p in enumerate(dof):
            
-            fig_1.add_trace(go.Scatter(x=self.fl, y=amp[i, :, 0], name=f'DoF: {p}'))
+            fig_1.add_trace(go.Scatter(x=self.fl * freq_convert, y=amp[i, :, 0], name=f'DoF: {p}'))
             if 'unb' in whirl:
                 fig_1.data[-1].y = fig_1.data[-1].y * self.fl ** 2
 
         if amp.shape[2] == 2:
             for i, p in enumerate(dof):
-                fig_2.add_trace(go.Scatter(x=self.fl, y=amp[i, :, 1], name=f'DoF: {p}'))
+                fig_2.add_trace(go.Scatter(x=self.fl * freq_convert, y=amp[i, :, 1], name=f'DoF: {p}'))
 
         fig_1.update_layout(
             xaxis={'range': [0, np.max(self.fl)],
                    },
-            xaxis_title='Frequency [rad/s]',
-            yaxis_title='Amplitude [m RMS]',
+            xaxis_title=f'Frequency [{frequency_units}]',
+            yaxis_title=f'Amplitude [m RMS]',
             title='Forward Excitation'
         )
         fig_1.update_yaxes(type="log")
@@ -1065,8 +1070,8 @@ class LinearResults():
         fig_2.update_layout(
             xaxis={'range': [0, np.max(self.fl)],
                    },
-            xaxis_title='Frequency [rad/s]',
-            yaxis_title='Amplitude [m RMS]',
+            xaxis_title=f'Frequency [{frequency_units}]',
+            yaxis_title=f'Amplitude [m {amplitude_units}]',
             title='Backward Excitation'
         )
         fig_2.update_yaxes(type="log")
