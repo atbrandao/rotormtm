@@ -296,7 +296,7 @@ class IntegrationResults():
 
         fig = go.Figure()
         if dof is None:
-            dof = [j for j in self.ddl[0].keys() if j != 'time']
+            dof = [j for j in self.ddl[0].keys() if (j != 'time' and j != 'solver')]
 
         rms = np.zeros((len(dof), len(self.fl)))
 
