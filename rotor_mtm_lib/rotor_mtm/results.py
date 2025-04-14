@@ -325,7 +325,7 @@ class IntegrationResults():
             fig.add_trace(go.Scatter(x=self.fl * freq_convert, y=rms[i, :], name=f'DoF: {p}'))
 
         fig.update_layout(
-                          xaxis={'range': [0, np.max(self.fl)],
+                          xaxis={'range': [0, np.max(self.fl) * freq_convert],
                                  },
                           xaxis_title=f'Frequency [{frequency_units}]',
                           yaxis_title=f'Amplitude [m {amplitude_units}]',
@@ -1059,7 +1059,7 @@ class LinearResults():
                 fig_2.add_trace(go.Scatter(x=self.fl * freq_convert, y=amp[i, :, 1], name=f'DoF: {p}'))
 
         fig_1.update_layout(
-            xaxis={'range': [0, np.max(self.fl)],
+            xaxis={'range': [0, np.max(self.fl) * freq_convert],
                    },
             xaxis_title=f'Frequency [{frequency_units}]',
             yaxis_title=f'Amplitude [m RMS]',
