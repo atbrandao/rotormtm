@@ -392,18 +392,25 @@ class Sys_NL:
                            v])
         return x
 
-    def z_to_x(self, z, t, omg, state_space=False):
+    def z_to_x(self, z, t, omg, state_space=False, probe_dof=None):
 
-        aux = np.append(np.array([1]),
-                        np.hstack([np.array([np.sin(omg * i / self.nu * t),
-                                             np.cos(omg * i / self.nu * t)]) for i in range(1, self.n_harm + 1)]))
-        x = np.zeros((self.ndof, 1))
-        for i in range(self.ndof):
-            x[i] = np.sum(aux * z[i::self.ndof])
+        aux = np.vstack([np.ones(len(t))] +
+                        [np.vstack([np.sin(omg * i / self.nu * t),
+                                    np.cos(omg * i / self.nu * t)]) for i in range(1, self.n_harm + 1)])
+        
+        if probe_dof is None:
+            probe_dof = [a for a in range(self.ndof)]
+
+        x = np.zeros((len(probe_dof), len(t)))
+        for i, n in enumerate(probe_dof):
+            x[i, :] = np.sum(
+                aux * z[n::self.ndof],
+                axis=0
+                )
         #
         # x = self.gamma(omg,
         #                t=np.array([t])) @ z
-        x = x.reshape(len(x), 1)
+        # x = x.reshape(len(x), 1)
 
         if state_space:
             aux_v = np.append(np.array([1]),
@@ -1157,6 +1164,7 @@ class Sys_NL:
             dt = 2 * np.pi / omg / (np.round(2 * np.pi / omg / dt_base))
             t_rk = np.arange(0, tf2 + dt / 2, dt)
             t_out = t_rk[::downsampling]
+
             if isinstance(continuation, bool):
                 if not continuation:
                     x0 = self.inv_fourier(z0,
@@ -1178,16 +1186,30 @@ class Sys_NL:
                 if save_raw_data:
                     with open(f'{save_raw_data}data_rk4 f {f} _ omg-{omg}.pic'.replace(':', '_'), 'wb') as file:
                         dump([x_rk, t_out], file)
-                if return_results:
-                    data_dict_list.append(dict(time=t_out))
-                    for j, p in enumerate(probe_names):
-                        data_dict_list[-1][p] = x_rk[j, :]
 
+            if return_results:
+                data_dict_list.append(dict(time=t_out))
+                for j, p in enumerate(probe_names):
+                    if calc:
+                        x_out = x_rk
+                        solver = 'rk4'
+                    else:
+                        x_out = self.z_to_x(
+                            z=z.reshape((len(z), 1)), 
+                            t=t_out, 
+                            omg=omg, 
+                            state_space=False,
+                            probe_dof=probe_dof
+                            )
+                        solver = 'hb'
+                        
+                    data_dict_list[-1][p] = x_out[j, :]
+                    data_dict_list[-1]['solver'] = solver
 
                 rms[:, i] = np.array(
                     [np.sqrt(
-                        np.sum((x_rk[i, int(x_rk.shape[1] / 2):] - np.mean(x_rk[i, int(x_rk.shape[1] / 2):])) ** 2) / (
-                            int(x_rk.shape[1] / 2))) for i in range(x_rk.shape[0])])
+                        np.sum((x_out[i, int(x_out.shape[1] / 2):] - np.mean(x_out[i, int(x_out.shape[1] / 2):])) ** 2) / (
+                            int(x_out.shape[1] / 2))) for i in range(x_out.shape[0])])
 
                 print(
                     f'RK4 took {(time.time() - t1):.1f} seconds to run: {(time.time() - t1) / (thb - t0):.1f} times longer.')
