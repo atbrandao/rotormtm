@@ -1201,6 +1201,7 @@ class Sys_NL:
                             state_space=False,
                             probe_dof=probe_dof
                             )
+                        x0 = x_hb[:, 0]
                         solver = 'hb'
                         
                     data_dict_list[-1][p] = x_out[j, :]

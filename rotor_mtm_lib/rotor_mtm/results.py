@@ -78,8 +78,9 @@ class IntegrationResults():
 
     @staticmethod
     def _adjust_plot(fig,
-                     font_size=24,
-                     maintain_proportions=False):
+                     font_size=30,
+                     maintain_proportions=False,
+                     colorbar_above=False):
 
         if not maintain_proportions:
             fig.update_layout(width=800,
@@ -99,6 +100,15 @@ class IntegrationResults():
                                           'size': 25},
                                  },
                           )
+        
+        if isinstance(fig.data[0], go.Heatmap) and colorbar_above:
+            fig.data[0].colorbar.orientation = 'h'
+            fig.data[0].colorbar.yanchor = 'top'
+            fig.data[0].colorbar.y = 1.25
+            fig.layout.legend.yanchor = 'top'
+            fig.layout.legend.y = 1.11
+            fig.update_layout(width=800,
+                              height=800)
 
         return fig
 
@@ -402,6 +412,7 @@ class IntegrationResults():
                                      legendgroup=f'{i[0]}'
                                      )
                           )
+            
 
             if np.max(np.abs(d[i[0]])) > max_amp:
                 max_amp = np.max(np.abs(d[i[0]]))
@@ -778,7 +789,8 @@ class IntegrationResults():
                       cut=2,
                       log_mode=False,
                       backward_vector=False,
-                      plot_3d=False):
+                      plot_3d=False
+                      ):
 
         fig = go.Figure()
         t = self.ddl[0]['time']
@@ -854,7 +866,7 @@ class IntegrationResults():
             if log_mode:
                 z = np.log10(np.abs(z))
                 zmin = np.min(z[np.isnan(z) == False])
-                zmax = 10
+                zmax = np.max(z[np.isnan(z) == False])
                 legend_text = ' [log]'
             else:
                 zmin = np.min(z[np.isnan(z) == False])
@@ -987,6 +999,13 @@ class LinearResults():
         self.rb = self.res_backward
         self.fl = self.frequency_list
 
+    def _find_frequency_index(self, f):
+
+        a = np.array(self.fl) - f
+        i = np.argmin(abs(a))
+
+        return i
+
     def _calc_amplitude(self,
                         x,
                         amplitude_units='rms'):
@@ -1083,3 +1102,57 @@ class LinearResults():
             return fig_1, fig_2
         else:
             return fig_1
+        
+    def plot_orbit(self,
+                   frequency,
+                   dof,
+                   whirl='forward',
+                   f=1):
+
+        fig = go.Figure()
+        
+        if whirl == 'forward' or whirl == 'unbalance':
+            dl = self.rf
+        elif whirl == 'backward':
+            dl = self.rb
+
+        i = self._find_frequency_index(frequency)
+        t = np.linspace(0, 1.9 * np.pi, 200)
+        if whirl == 'unbalance':
+            f = f * self.fl[i] ** 2
+
+        max_amp = 0
+        for j, d in enumerate(dof):
+            x = f * np.abs(dl[d[0]][i]) * np.cos(t + np.angle(dl[d[0]][i]))
+            y = f * np.abs(dl[d[1]][i]) * np.cos(t + np.angle(dl[d[1]][i]))
+            fig.add_trace(go.Scatter(x=x,
+                                     y=y,
+                                     name=f'{d[0]} vs {d[1]}',
+                                     mode='lines',
+                                     legendgroup=f'{j}')
+                          )
+
+            fig.add_trace(go.Scatter(x=[x[0]],
+                                     y=[y[0]],
+                                     mode='markers',
+                                     marker=dict(color='red'),
+                                     name='Poincaré Section',
+                                     showlegend=False,
+                                     legendgroup=f'{j}'
+                                     )
+                          )
+            
+            if np.max(np.abs(x)) > max_amp:
+                max_amp = np.max(np.abs(x))
+            if np.max(np.abs(y)) > max_amp:
+                max_amp = np.max(np.abs(y))
+
+        fig.update_layout(title=f'Orbit Plot',
+                          xaxis_range=[- 1.1 * max_amp, 1.1 * max_amp],
+                          yaxis_range=[- 1.1 * max_amp, 1.1 * max_amp],
+                          xaxis_title=f'X [m]',
+                          yaxis_title=f'Y [m]',
+                          )
+        fig = IntegrationResults._adjust_plot(fig)
+
+        return fig

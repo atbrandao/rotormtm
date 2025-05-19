@@ -2,6 +2,7 @@
 import ross as rs
 import numpy as np
 from scipy import linalg as la
+from scipy.optimize import newton
 import sys
 import plotly.graph_objects as go
 from .harmbal import Sys_NL
@@ -47,6 +48,26 @@ class RotorMTM:
         self.coriolis = True
         self.cross_inertia= True
 
+    @staticmethod
+    def calc_f1(dk_r, f, whirl='backward'):
+        
+        if whirl == 'backward':
+            sign = -1
+        elif whirl == 'forward':
+            sign = 1
+
+        alpha = dk_r.Ip / dk_r.Id
+        fun = lambda w : (alpha ** 2 - 2) * f ** 2 + sign * alpha * f * np.sqrt(4 * w ** 2 + alpha ** 2 * f ** 2) + 2 * w ** 2
+        fun_prime = lambda w : 8 * w * 1 / 2 * sign * alpha * f * (4 * w ** 2 + alpha ** 2 * f ** 2) ** (-1 / 2) + 4 * w
+
+        res = newton(func=fun,
+                     x0=f,
+                     fprime=fun_prime,
+                    )
+        
+        return res
+
+    
     def M(self):
 
         N = 4 * self.n_res
