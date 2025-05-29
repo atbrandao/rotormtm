@@ -101,7 +101,10 @@ class IntegrationResults():
                                  },
                           )
         
-        if isinstance(fig.data[0], go.Heatmap) and colorbar_above:
+        if fig.layout.yaxis.type == 'log':
+            fig.layout.yaxis.tickvals = [10**i for i in range(-10, 4)]
+        
+        if len(fig.data) > 0 and isinstance(fig.data[0], go.Heatmap) and colorbar_above:
             fig.data[0].colorbar.orientation = 'h'
             fig.data[0].colorbar.yanchor = 'top'
             fig.data[0].colorbar.y = 1.25
