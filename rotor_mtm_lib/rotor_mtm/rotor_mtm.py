@@ -11,6 +11,81 @@ from .results import LinearResults
 class RotorMTM:
 
     def __init__(self,rotor,n_pos,dk_r,k0,k1,var=0,var_k=0,p_damp=1e-4,ge=True,exp_var=1):
+        """ A metarotor object
+
+        This class represents a metarotor, which is a gyroscopic metastructure
+        consisting of a rotor with attached disk elements.
+        The attached disks are provided in the parameter dk_r.
+        The attachment stiffnesses, in both radial (x and y) and rotational (theta_x and theta_y) directions,
+        are defined by k0 and k1, respectively.
+        The simulation of Rainbow Metastructure arrangement is also possible using the parameters var and var_k.
+
+        Parameters
+        ----------
+        rotor : ross.Rotor
+            The rotor object to be used as base.
+        n_pos : list
+            List of nodal positions where the disks are located.
+        dk_r : ross.DiskElement or list of ross.DiskElement
+            The disk element(s) to be added to the rotor.
+        k0 : float
+            Attachment stiffness in the radial directions, in N/m.
+            Value of k0 should be chosen to provide the desired translational
+            tuning frequency of the resonators.
+        k1 : float
+            Attachment stiffness in the rotational directions, in N.m/rad.
+            Value of k1 should be chosen to provide the desired rotational 
+            tuning frequency of the resonators. Refer to method .calc_f1() for more details.
+        var : float, optional
+            Variation factor for the mass, by default 0.
+        var_k : float, optional
+            Variation factor for the stiffness in the radial direction, by default 0.
+        p_damp : float, optional
+            Proportional damping factor, by default 1e-4.
+        ge : bool, optional
+            Whether to include gyroscopic effects, by default True.
+        exp_var : float, optional
+            Exponent for the variation factor, by default 1.
+
+        Returns
+        -------
+        A metarotor object.
+
+        Attributes
+        ----------
+        n_res : int
+            Number of resonators (disk elements).
+        rotor_solo_disks : ross.Rotor
+            Rotor with the disk elements added as lumped masses.
+        rotor_solo : ross.Rotor
+            Rotor without the disk elements.
+        var : float
+            Variation factor for the mass.
+        var_k : float
+            Variation factor for the stiffness.
+        p_damp : float
+            Proportional damping factor.
+        ge : bool
+            Whether to include gyroscopic effects.
+        dk_r : list of ross.DiskElement
+            List of disk elements representing the resonators.
+        k0 : float
+            Attachment stiffness in the radial directions, in N/m.
+        k1 : float
+            Attachment stiffness in the rotational directions, in N.m/rad.
+        exp_var : float
+            Exponent for the variation factor.
+        n_pos : list
+            List of nodal positions where the disks are located.
+        m_ratio : float
+            Ratio of the total mass of the disk elements to the mass of the rotor.
+        N : int
+            Total number of degrees of freedom in the metarotor system.
+        N2 : int
+            Number of degrees of freedom in the rotor without disk elements.
+
+        
+        """
 
         self.n_res = len(n_pos)
         self.var = var
@@ -44,12 +119,32 @@ class RotorMTM:
         self.N = len(self._rotor.M())
         self.N2 = len(self.rotor_solo.M())
 
-        self.unb = True
-        self.coriolis = True
-        self.cross_inertia= True
-
     @staticmethod
     def calc_f1(dk_r, f, whirl='backward'):
+        """Calculate the tuning frequency of the resonator in the rotational direction.
+        The rotational (or flexural) natural frequencies omega_1 of the resonators are a function of 
+        the speed Omega, due to gyroscopic effects. Therefore, to achieve attenuation at a 
+        target frequency Omega_t in synchronous excitation, the tuning frequency must satisfy:
+        .. math::
+            \\Omega_t = \\omega_1(\\Omega_t)
+
+        Refer to Brandão et al. (2022) for further details.
+        https://doi.org/10.1016/j.jsv.2022.116982
+
+        Parameters
+        ----------
+        dk_r : ross.DiskElement
+            The disk element representing the resonator.
+        f : float
+            The desired target frequency Omega_t, in rad/s, to be attenuated considering a synchronous excitation.
+        whirl : str, optional
+            The direction of whirl to be used for attenuation.
+            Either 'backward' or 'forward', by default 'backward'.
+        Returns
+        -------
+        float
+            The tuning frequency in the rotational direction.
+        """
         
         if whirl == 'backward':
             sign = -1
@@ -69,6 +164,14 @@ class RotorMTM:
 
     
     def M(self):
+        """Calculate the mass matrix of the metarotor system.
+        The mass matrix is modified to include the disk elements (resonators) with their respective mass and variation factors.
+        Returns
+        -------
+        numpy.ndarray
+            The mass matrix of the metarotor system.
+        """
+
 
         N = 4 * self.n_res
 
@@ -82,16 +185,6 @@ class RotorMTM:
                 f = 1
             M_add[i:i + 4, i:i + 4] = self.dk_r[i // 4].M() * f
 
-            # if self.cross_inertia:
-            #     M[self.N2 + i, self.n_pos[i // 4] * 4] = self.dk_r[i // 4].m * f
-            #     M[self.N2 + i + 1, self.n_pos[i // 4] * 4 + 1] = self.dk_r[i // 4].m * f
-            #
-            #     M[self.n_pos[i // 4] * 4, self.n_pos[i // 4] * 4] += self.dk_r[i // 4].m * f
-            #     M[self.n_pos[i // 4] * 4 + 1, self.n_pos[i // 4] * 4 + 1] += self.dk_r[i // 4].m * f
-            #
-            #     M[self.n_pos[i // 4] * 4, self.N2 + i] += self.dk_r[i // 4].m * f
-            #     M[self.n_pos[i // 4] * 4 + 1, self.N2 + i + 1] += self.dk_r[i // 4].m * f
-
         dof = range(self.N2, N + self.N2)
 
         M[np.ix_(dof, dof)] = M_add
@@ -99,6 +192,13 @@ class RotorMTM:
         return M
 
     def G(self):
+        """Calculate the gyroscopic matrix of the metarotor system.
+        The gyroscopic matrix is modified to include the disk elements (resonators) with their respective gyroscopic effects.
+        Returns
+        -------
+        numpy.ndarray
+            The gyroscopic matrix of the metarotor system.
+        """
 
         N = 4 * self.n_res
 
@@ -118,7 +218,22 @@ class RotorMTM:
 
         return G
 
-    def K(self, sp, connectivity_matrix=None):#K, C, n_pos, k0, k1, var=0, p_damp=0):
+    def K(self, sp, connectivity_matrix=None):
+        """Calculate the stiffness matrix of the metarotor system.
+        The stiffness matrix is modified to include the disk elements (resonators) with their respective stiffness and variation factors.
+        Parameters
+        ----------
+        sp : float
+            The speed at which the stiffness matrix is calculated, in rad/s.
+        connectivity_matrix : list, optional
+            If this attribute is provided, the method will return the connectivity matrix instead 
+            of the actual stiffness matrix. Connectivity matrix in the DoFs provided in the list
+            will be provided. DoFs are 0=x, 1=y, 2=theta_x, 3=theta_y.
+        Returns
+        -------
+        numpy.ndarray
+            The stiffness matrix of the metarotor system.
+        """
 
         N = 4 * self.n_res
 
@@ -143,31 +258,8 @@ class RotorMTM:
                               [0, 0, -self.k1 * f, 0, 0, 0, self.k1 * f, 0],
                               [0, 0, 0, -self.k1 * f, 0, 0, 0, self.k1 * f], ])
 
-            # K_aux = self.unb * np.array([
-            #     [0, 0, 0, 0, 0, 0, 0, 0],
-            #     [0, 0, 0, 0, 0, 0, 0, 0],
-            #     [0, 0, self.k1 * f, 0, 0, 0, -self.k1 * f, 0],
-            #     [0, 0, 0, self.k1 * f, 0, 0, 0, -self.k1 * f],
-            #     [0, 0, 0, 0, self.k0, 0, 0, 0],
-            #     [0, 0, 0, 0, 0, self.k0, 0, 0],
-            #     [0, 0, -self.k1 * f, 0, 0, 0, self.k1 * f, 0],
-            #     [0, 0, 0, -self.k1 * f, 0, 0, 0, self.k1 * f]
-            # ])
-            # Resonator Unbalance
-            m_res = M[self.N2 + 4 * i, self.N2 + 4 * i]
-            K_unb = self.unb * np.array([
-                [- sp ** 2 * m_res, 0, 0, 0, sp ** 2 * m_res, 0, 0, 0],
-                [0, - sp ** 2 * m_res, 0, 0, 0, sp ** 2 * m_res, 0, 0],
-                [0, 0, 0, 0, 0, 0, 0, 0],
-                [0, 0, 0, 0, 0, 0, 0, 0],
-                [sp ** 2 * m_res, 0, 0, 0, - sp ** 2 * m_res, 0, 0, 0],
-                [0, sp ** 2 * m_res, 0, 0, 0, - sp ** 2 * m_res, 0, 0],
-                [0, 0, 0, 0, 0, 0, 0, 0],
-                [0, 0, 0, 0, 0, 0, 0, 0]
-            ])
-
             dof_aux = [4 * i + a for a in range(4)] + [N + 4 * i + a for a in range(4)]
-            K_add[np.ix_(dof_aux, dof_aux)] = K_aux #+ K_unb
+            K_add[np.ix_(dof_aux, dof_aux)] = K_aux
 
         dof = dof + [a for a in range(self.N2, N + self.N2)]
         # print(dof)
@@ -185,20 +277,23 @@ class RotorMTM:
                     K_add[i::4] = K_add[i::4] / self.k1
                 else:
                     K_add[i::4] = 0
-#            if connectivity_matrix == 0:
-#                K_add[2::4] = 0
-#                K_add[3::4] = 0
-#                K_add = K_add / self.k0
-#            elif connectivity_matrix == 1:
-#                K_add[0::4] = 0
-#                K_add[1::4] = 0
-#                K_add = K_add / self.k1
 
         K[np.ix_(dof, dof)] += K_add
 
         return K
 
-    def C(self, sp):  # K, C, n_pos, k0, k1, var=0, p_damp=0):
+    def C(self, sp):
+        """Calculate the damping matrix of the metarotor system.
+        The damping matrix is modified to include the disk elements (resonators) with their respective damping factors.
+        Parameters
+        ----------
+        sp : float
+            The speed at which the damping matrix is calculated, in rad/s.
+        Returns
+        -------
+        numpy.ndarray
+            The damping matrix of the metarotor system.
+        """
 
         N = 4 * self.n_res
 
@@ -220,29 +315,7 @@ class RotorMTM:
                               [0, -self.k0 * f, 0, 0, 0, self.k0 * f, 0, 0],
                               [0, 0, -self.k1 * f, 0, 0, 0, self.k1 * f, 0],
                               [0, 0, 0, -self.k1 * f, 0, 0, 0, self.k1 * f], ])
-
-            # K_aux = self.unb * np.array([
-            #     [0, 0, 0, 0, 0, 0, 0, 0],
-            #     [0, 0, 0, 0, 0, 0, 0, 0],
-            #     [0, 0, self.k1 * f, 0, 0, 0, -self.k1 * f, 0],
-            #     [0, 0, 0, self.k1 * f, 0, 0, 0, -self.k1 * f],
-            #     [0, 0, 0, 0, self.k0, 0, 0, 0],
-            #     [0, 0, 0, 0, 0, self.k0, 0, 0],
-            #     [0, 0, -self.k1 * f, 0, 0, 0, self.k1 * f, 0],
-            #     [0, 0, 0, -self.k1 * f, 0, 0, 0, self.k1 * f]
-            # ])
-
-            # Coriolis forces
-            # C_coriolis = self.coriolis * np.array([
-            #     [0, 0, 0, 0, 0, - 2 * sp * self.dk_r[i].m, 0, 0],
-            #     [0, 0, 0, 0, 2 * sp * self.dk_r[i].m, 0, 0, 0],
-            #     [0, 0, 0, 0, 0, 0, 0, 0],
-            #     [0, 0, 0, 0, 0, 0, 0, 0],
-            #     [0, 0, 0, 0, 0, - 2 * sp * self.dk_r[i].m, 0, 0],
-            #     [0, 0, 0, 0, 2 * sp * self.dk_r[i].m, 0, 0, 0],
-            #     [0, 0, 0, 0, 0, 0, 0, 0],
-            #     [0, 0, 0, 0, 0, 0, 0, 0],
-            # ])
+            
             dof_aux = [4 * i + a for a in range(4)] + [N + 4 * i + a for a in range(4)]
             C_add[np.ix_(dof_aux, dof_aux)] = self.p_damp * K_aux # + C_coriolis
 
@@ -254,6 +327,17 @@ class RotorMTM:
         return C
 
     def A(self,sp):
+        """Calculate the state space matrix A of the metarotor system.
+        The system matrix A is constructed from the mass, stiffness, damping, and gyroscopic matrices.
+        Parameters
+        ----------
+        sp : float
+            The speed at which the state space matrix is calculated, in rad/s.
+        Returns
+        -------
+        numpy.ndarray
+            The state space matrix A of the metarotor system.
+        """
 
         M = self.M()
         K = self.K(sp)
@@ -271,11 +355,42 @@ class RotorMTM:
 
         return A
 
-    def plot_rotor(self,*args):
+    def plot_rotor(self,*kwargs):
+        """Plot the rotor with the disk elements (resonators) added.
+        This method uses the plot method of the rotor_solo_disks attribute to visualize the rotor.
+        Parameters
+        ----------
+        *kwargs : dict
+            Additional keyword arguments to be passed to the plot method.
+            Same keyword arguments as ross.Rotor.plot_rotor().
+        Returns
+        plotly.graph_objects.Figure
+            The figure object containing the plot of the rotor.
+        """
 
-        return self.rotor_solo_disks.plot_rotor(*args)
+        return self.rotor_solo_disks.plot_rotor(*kwargs)
 
-    def calc_H(self,sp,f,rotor_solo=False):#K, C, G, M, sp):
+    def calc_H(self, sp, f, rotor_solo=False):
+        """Calculate the transfer matrix H for the metarotor system.
+        The matrix H is calculated based on the state space matrix A and the mass matrix M.
+        The linear response of the system to a harmonic excitation F can be calculated as x = H @ M_inv @ F, 
+        where F is the force vector in state space coordinates and M_inv is also provided by this method.
+        Parameters
+        ----------
+        sp : float
+            The speed at which the transfer matrix is calculated, in rad/s.
+        f : float
+            The frequency at which the system matrix is calculated, in rad/s.
+        rotor_solo : bool, optional
+            Whether to calculate the transfer matrix for the rotor with disk elements as lumped masses instead of resonators.
+            By default False.
+        Returns
+        -------
+        H : numpy.ndarray
+            The transfer matrix H of the metarotor system.
+        M_inv : numpy.ndarray
+            The inverse of the mass matrix M of the metarotor system in state space coordinates.
+        """
 
         if rotor_solo:
             M = self.rotor_solo_disks.M()
@@ -293,8 +408,58 @@ class RotorMTM:
 
         return H, M_inv
 
-    def omg_list(self,sp,n_modes=50, dof=None, diff_lim=2, rotor_solo=False,
-                 cross_prod=False, energy=False):
+    def omg_list(self, 
+                 sp, 
+                 n_modes=50, 
+                 dof=None, 
+                 diff_lim=1e9, 
+                 rotor_solo=False,
+                 cross_prod=False, 
+                 energy=False):
+        """Calculate the natural frequencies and mode shapes of the metarotor system.
+        The method attemps to separate "rotor modes" from "resonator modes" based on the displacement ratio.
+
+        The method also calculates and returns the complex differential amplification vectors for each mode shape.
+        Refer to Brandão et al. (2022) for further details.
+        https://doi.org/10.1016/j.jsv.2022.116982
+
+        Parameters
+        ----------
+        sp : float
+            The rotating speed at which the natural frequencies are calculated, in rad/s.
+        n_modes : int, optional
+            The number of modes to be provided, by default 50.
+        dof : int, optional
+            The degree of freedom to be considered for the differential amplification calculation, by default None.
+            If None, all DoFs are used.
+            dof = 0, x direction is considered.
+            dof = 1, y direction is considered.
+            dof = 2, theta_x direction is considered.
+            dof = 3, theta_y direction is considered.
+        diff_lim : float, optional
+            The limit for the difference between the mode shape and the nodal positions above which 
+            the mode is considered a resonator mode.
+            By default 1e9, which should establish all modes as rotor modes.
+        rotor_solo : bool, optional
+            Whether to calculate the natural frequencies for the rotor with disk elements as lumped masses instead of resonators.
+            By default False.
+        cross_prod : bool, optional
+            Whether to calculate the cross product of the mode shapes, by default False.
+        energy : bool, optional
+            Whether to calculate the energy of the mode shapes, by default False.
+        Returns
+        -------
+        tuple
+            A tuple containing the following elements:
+            - omg_list: List of natural frequencies of the metarotor system.
+            - omg_list_res: List of natural frequencies of the resonators.
+            - u_list: List of mode shapes of the metarotor system.
+            - u_list_res: List of mode shapes of the resonators.
+            - csi_list: List of damping ratios of the metarotor system.
+            - csi_list_res: List of damping ratios of the resonators.
+            - diff_list: List of differences between the mode shapes and nodal positions for the metarotor system.
+            - diff_list_res: List of differences for the resonators.
+        """
 
         if rotor_solo:
             A = self.rotor_solo_disks.A(sp)
@@ -314,7 +479,7 @@ class RotorMTM:
 
         i_aux = np.argsort(np.abs(np.imag(w)))
         i_aux = np.array([a for a in i_aux if np.abs(np.real(w[a]) / np.imag(w[a])) < 1])
-        csi = np.abs(np.real(w[i_aux]))
+        csi = np.abs(np.real(w[i_aux])) / np.abs(w[i_aux])
         w = np.abs(np.imag(w[i_aux]))
         u = u[:, i_aux]
 
@@ -327,9 +492,14 @@ class RotorMTM:
         diff_list = []
         diff_list_res = []
 
-        for i in range(n_modes):  # i < len(w) and w[i] <= w_max :
-            if not rotor_solo:
+        for i in range(n_modes):
+        
+            if rotor_solo:
+                omg_list.append(w[i])
+                u_list.append(u[:, i])
+                csi_list.append(csi[i])
 
+            else:                
                 diff2 = res_diff(u[dof:N1 // 2:step, i], self.n_pos)
                 if cross_prod:
                     diff = res_diff(u[dof:N1 // 2:step, i], self.n_pos, cross_prod=cross_prod)
@@ -339,39 +509,55 @@ class RotorMTM:
                     diff = diff2
 
                 if np.sum([a > diff_lim for a in
-                           np.abs(diff2)]) >= 1:  # and np.sum([a>0.2 for a in np.angle(diff)]) > 3:#2*s_rotor > s_res_rel:
+                           np.abs(diff2)]) >= 1: 
                     omg_list_res.append(w[i])
                     u_list_res.append(u[:, i])
                     csi_list_res.append(csi[i])
                     diff_list_res.append(diff)
-                else:  # if s_res_abs > s_rotor:
+                else:  
                     omg_list.append(w[i])
                     u_list.append(u[:, i])
                     csi_list.append(csi[i])
                     diff_list.append(diff)
-
-            else:
-                omg_list.append(w[i])
-                u_list.append(u[:, i])
-                csi_list.append(csi[i])
+                
 
             i += 1
 
         return omg_list, omg_list_res, u_list, u_list_res, csi_list, csi_list_res, diff_list, diff_list_res
 
-    def x_out(self, sp, f, unb_node=0, rotor_solo=False):
+    def x_out(self, sp, f, ecx_node=0, rotor_solo=False):
+        """Calculate the linear responses of the metarotor system to harmonic excitations in backward and forward directions.
+        The method computes the response of the system to a force vector F applied at the chosen excitation node.
+        Parameters
+        ----------
+        sp : float
+            The rotating speed at which the response is calculated, in rad/s.
+        f : float
+            The frequency at which the response is calculated, in rad/s.
+        exc_node : int, optional
+            The nodal position at which excitation is applied.
+            By default 0, which corresponds to the first node.
+        rotor_solo : bool, optional
+            Whether to calculate the response for the rotor with disk elements as lumped masses instead of resonators.
+            By default False.
+        Returns
+        tuple
+            A tuple containing the following elements:
+            - y: The system's response vector to a forward excitation.
+            - y_b: The system's response vector to a backward excitation.            
+        """
 
         H, Minv = self.calc_H(sp, f, rotor_solo)
 
         N = len(H) // 2
 
         F = np.zeros((2 * N, 1)).astype(complex)
-        F[N + 4 * unb_node] = 1
-        F[N + 4 * unb_node + 1] = -1.j
+        F[N + 4 * ecx_node] = 1
+        F[N + 4 * ecx_node + 1] = -1.j
 
         F_b = np.zeros((2 * N, 1)).astype(complex)
-        F_b[N + 4 * unb_node] = 1
-        F_b[N + 4 * unb_node + 1] = 1.j
+        F_b[N + 4 * ecx_node] = 1
+        F_b[N + 4 * ecx_node + 1] = 1.j
 
         y = H @ (Minv @ F)
         y_b = H @ (Minv @ F_b)
@@ -387,6 +573,37 @@ class RotorMTM:
                  rotor_solo=False,
                  silent=True
                  ):
+        """Calculate the frequency response function (FRF) of the metarotor system.
+        The method computes the linear response of the system to harmonic excitations at specified frequencies,
+        returning a results.LinearResults object containing the forward and backward responses.
+        Parameters
+        ----------
+        sp_arr : list, numpy.ndarray
+            List of rotating speeds at which the FRF is calculated, in rad/s.
+        f : float
+            The amplitude of the harmonic excitation force applied at the excitation node.
+        probe_dof : list, optional
+            List of degrees of freedom at which the response is probed.
+            If None, all DoFs are used.
+            By default None.
+        probe_names : list, optional
+            List of names for the probe DoFs.
+            If None, the names are set to the indices of the probe DoFs.
+            By default None.
+        f_node : int, optional
+            The nodal position at which the excitation force is applied.
+            By default 0, which corresponds to the first node.
+        rotor_solo : bool, optional
+            Whether to calculate the FRF for the rotor with disk elements as lumped masses instead of resonators.
+            By default False.
+        silent : bool, optional
+            Whether to suppress the output messages during the calculation.
+            By default True.
+        Returns
+        results.LinearResults
+            An object containing the frequency response function results, including the forward and backward responses.
+            The results are stored in a dictionary with probe names as keys and the corresponding responses as values.
+        """
 
         if probe_dof is None:
             probe_dof = [a for a in range(self.N)]
@@ -399,7 +616,7 @@ class RotorMTM:
         for i, omg in enumerate(sp_arr):
             r = self.x_out(sp=omg,
                            f=omg,
-                           unb_node=f_node,
+                           ecx_node=f_node,
                            rotor_solo=rotor_solo)
 
             for j, p in enumerate(probe_names):
@@ -414,10 +631,106 @@ class RotorMTM:
                              res_back,
                              self)
 
-    def run_analysis(self, sp_arr, n_modes=50, dof=0, dof_show=0, diff_lim=5, unb_node=0, probe_node=None,
-                     heatmap=False, diff_analysis=False, cross_prod=False, energy=False, silent=False,
+    def run_analysis(self, 
+                     sp_arr, 
+                     n_modes=50, 
+                     dof=0, 
+                     dof_show=0, 
+                     diff_lim=1e9, 
+                     unb_node=0, 
+                     probe_node=None,
+                     heatmap=False, 
+                     diff_analysis=False, 
+                     cross_prod=False, 
+                     energy=False, 
+                     silent=False,
                      backward_vector=False):
+        """Run modal and forced response analyses of the metarotor system.   
+        The results of this method are intended to be used with the plot functions available in this module.
+        The method calculates the natural frequencies, mode shapes, and differential amplification vectors of the system.
+        It also computes the linear responses of the system to harmonic excitations at specified frequencies.
+        The forced response analysis can include asynchronous excitations to create heatmaps for response and differential amplification.
+        Parameters
+        ----------
+        sp_arr : list, numpy.ndarray
+            List of rotating speeds at which the analysis is performed, in rad/s.
+        n_modes : int, optional
+            The number of modes to be provided, by default 50.
+        dof : int, optional
+            The degree of freedom to be considered for the differential amplification calculation, by default 0.
+            If dof = 0, x direction is considered.
+            If dof = 1, y direction is considered.
+            If dof = 2, theta_x direction is considered.
+            If dof = 3, theta_y direction is considered.
+        dof_show : int, optional
+            The degree of freedom to be shown in the results, by default 0.
+            If dof_show = 0, x direction is considered.
+            If dof_show = 1, y direction is considered.
+            If dof_show = 2, theta_x direction is considered.
+            If dof_show = 3, theta_y direction is considered.
+        diff_lim : float, optional
+            The limit for the difference between the mode shape and the nodal positions above which 
+            the mode is considered a resonator mode.
+            By default 1e9, which should establish all modes as rotor modes.
+        unb_node : int, optional
+            The nodal position at which the unbalance is applied, by default 0.
+        probe_node : int, optional
+            The nodal position at which the response is probed, by default None.
+            If None, the probe node is set to self.N2//4 - 1, which corresponds to the last rotor node.
+        heatmap : bool, optional
+            Whether to calculate asynchronous responses for the generation of response heatmaps plots.
+            By default False.
+        diff_analysis : bool, optional
+            Whether to perform differential amplification analysis for both modal and forced response results.
+            By default False.
+        cross_prod : bool, optional
+            Whether to calculate the cross product instead of differential amplification, by default False.
+        energy : bool, optional
+            Whether to calculate the potential energy instead of differential amplification, by default False.           
+        silent : bool, optional
+            Whether to suppress the output messages during the analysis.
+            By default False.
+        backward_vector : bool, optional
+            Whether to return the backward vector instead of the backward component.
+            The backward vector may be useful for orbit plots. Use of backward component is recommended most applications.
+            By default False.
+        Returns
+        ------- 
+        dict
+            A dictionary of lists containing the results of the analysis for each rotating speed in sp_arr:
+            - 'ws': Natural frequencies of the rotor with disks as lumped masses.
+            - 'w': Natural frequencies of the "rotor modes".
+            - 'w_res': Natural frequencies of the "resonator modes".
+            - 'u': Mode shapes of the "rotor modes".
+            - 'u_res': Mode shapes of the "resonators modes".
+            - 'sp_arr': List of rotating speeds at which the analysis was performed.
 
+            if diff_analysis is True:
+                - 'diff': Differential amplification vectors for the "rotor modes".
+                - 'diff_res': Differential amplification vectors for the "resonator modes".
+
+            if heatmap is False:
+                - 'rsolo': Synchronous forward responses for the rotor with disks as lumped masses.
+                - 'rsolo_b': Synchronous backward responses for the rotor with disks as lumped masses.
+                - 'r': Synchronous forward responses for the metarotor system.
+                - 'r_b': Synchronous backward responses for the metarotor system.
+
+                if diff_analysis is True:
+                    - 'r_diff': Differential amplification vectors for the synchronous forward response.
+                    - 'r_diff_b': Differential amplification vectors for the synchronous backward response.
+
+            if heatmap is True:            
+                - 'rsolo_map': List of asynchronous forward responses for the rotor with disks as lumped masses.
+                - 'rsolo_b_map': List of asynchronous backward responses for the rotor with disks as lumped masses.
+                - 'r_map': List of asynchronous forward responses for the metarotor system.
+                - 'r_b_map': List of asynchronous backward responses for the metarotor system.
+
+                if diff_analysis is True:
+                    - 'diff_map': List of differential amplification vectors for the asynchronous forward response.
+                    - 'diff_map_b': List of differential amplification vectors for the asynchronous backward response.
+        
+        """
+        
         prog_bar_width = 40
         i_prog = 0
         if not silent:
@@ -591,12 +904,6 @@ class RotorMTM:
 
         return out
 
-    def ressonator_mass_ratio(self):
-
-        ratio = self.rotor_solo_disks.m / self._rotor.m - 1
-
-        return ratio
-
     def create_Sys_NL(self,
                       x_eq0=(None, None),
                       x_eq1=(None, None),
@@ -605,6 +912,48 @@ class RotorMTM:
                       nu=1,
                       N=1,
                       cp=1e-4):
+        """Create a nonlinear system object from the linear metarotor system object.
+        This method constructs a harmbal.Sys_NL object that represents a nonlinear version of the metarotor system.
+        This nonlinear system class considers bi-stable Duffin type nonlinearity for the resonators.
+
+        Refer to Brandão et al. (2025) for further details.
+        https://doi.org/10.1007/s11071-025-11597-z
+        Parameters
+        ----------
+        x_eq0 : tuple, optional
+            Tuple containing the radial equilibrium positions, in m, in X and Y directions, respectively.
+            If None, the attachment in the respective coordinate is considered linear.
+            By default (None, None).
+        x_eq1 : tuple, optional
+            Tuple containing the angular equilibrium positions, in rad, in theta_X and theta_Y directions, respectively.
+            If None, the attachment in the respective coordinate is considered linear.
+            By default (None, None).
+        sp : float, optional
+            The rotating speed at which the nonlinear system is created, in rad/s.
+            The nonlinear system matrices are calculated at this speed.
+            By default 0.
+        n_harm : int, optional
+            The number of harmonics to be considered in the Harmonic Balance Analysis.
+            By default 10.
+        nu : int, optional
+            Defines the number of inter-harmonics that will be considered in the Harmonic Balance Analysis.
+            For nu = 1, only integer harmonics are considered. 
+            For nu = 2 the half harmonics, 0.5X, 1.5X, 2.5X etc., are also considered.
+            By default 1.
+        N : int, optional
+            The number of full periods considered in Harmonic Balance time-domain steps.
+            By default 1.
+        cp : float, optional
+            The propostional damping coefficient for the nonlinear system.
+            By default 1e-4.
+        Returns
+        -------
+        harmbal.Sys_NL
+            An object representing the nonlinear version of the metarotor.
+            Bistable Duffin type nonlinearity is considered for the resonators attachment to the rotor.
+
+        """
+
 
         M = self.M()
         beta0 = -self.k0 / 2
@@ -654,11 +1003,60 @@ class RotorMTM:
         Sys.x_eq = x_eq
 
         return Sys
+    
 
-def plot_diff_modal(w, diff, sp_arr, mode='abs',n_plot=None,saturate=None, colorbar_left=False):
+
+def plot_diff_modal(w, 
+                    diff, 
+                    sp_arr, 
+                    mode='abs',
+                    n_plot=None,
+                    saturate=None, 
+                    colorbar_left=False):
+    """Plot the system's Cambell Diagram with differential amplification as the markers colorscale.    
+    The colorscale can be chosen as the absolute or phase of the differential amplification value.
+    The colorscale can show either the averaged values of differential amplification or the 
+    values for each  of the `n_plot` first resonators in a 3D Scatter plot.
+    Refer to Brandão et al. (2022) for further details.
+    https://doi.org/10.1016/j.jsv.2022.116982
+
+    This function is intended to be used with the results obtained from the `RotorMTM.run_analysis()` method.
+    Parameters
+    ----------
+    w : list
+        List of natural frequencies of the metarotor system.
+        Each element in the list corresponds to a different rotating speed in `sp_arr`.
+    diff : list
+        List of differential amplification vectors for the metarotor system.
+        Each element in the list corresponds to a different rotating speed in `sp_arr`.
+    sp_arr : list
+        List of rotating speeds at which the analysis was performed, in rad/s.
+    mode : str, optional
+        The mode of the plot, either 'abs' for absolute values or 'phase' for phase angles.
+        By default 'abs'.
+    n_plot : int, optional
+        The number of resonators to be plotted individually in a 3D Scatter plot.
+        If None, the averaged value is plotted in a 2D Scatter plot.
+        By default None.
+    saturate : float, optional
+        The saturation value for the color scale in the plot.
+        If None, the maximum value of the differential amplification vectors is used.
+        This can be used to improve the colorscale visualization.
+        By default None.
+    colorbar_left : bool, optional
+        Whether to place the colorbar on the left side of the plot.
+        If False, the colorbar is placed on the right side.
+        By default False.
+    Returns
+    -------
+    plotly.graph_objects.Figure
+        A Plotly figure object containing the system's Cambell Diagram with differential amplification as the markers colorscale.
+    """   
+
+    diff = [a[:np.min([len(a) for a in diff])] for a in diff]
 
     if saturate:
-        leg_add = f' (sat. 10)'
+        leg_add = f' (sat. {saturate})'
     else:
         leg_add = ''
 
@@ -786,13 +1184,61 @@ def plot_diff_modal(w, diff, sp_arr, mode='abs',n_plot=None,saturate=None, color
                           legend=dict(xanchor='center', x=0.5, yanchor='bottom',
                                       y=1, orientation='h'))
         
-   
-
     return fig
 
-def plot_camp_heatmap(r, w, sp_arr, w_res=None, colorbar_title='Response (log)',
-                      saturate_min=None,f_min=None, phase_angle=False):
+def plot_camp_heatmap(r, 
+                      sp_arr, 
+                      w=None, 
+                      w_res=None, 
+                      colorbar_title='Response (log)',
+                      saturate_min=None,
+                      f_min=None, 
+                      phase_angle=False):
+    """Plot the system's Campbell superimposed to the Response heatmap.
+    The heatmap shows the system's response to harmonic excitations at different rotating speeds and excitation frequencies.
+    The Campbell diagram may also included in the plot, showing the natural frequencies of the system.    
+    
+    This function is intended to be used with the results obtained from the `RotorMTM.run_analysis()` method.
+    Parameters
+    ----------
+    r : numpy.ndarray
+        2D array containing the system's response to harmonic excitations at different rotating speeds and excitation frequencies.
+        To provide the log10 value of absolute response is recommended for better visualization.
+        the average values of `diff_map` or `diff_map_b` can be used, in absolute or phase forms, to generate the differential amplification heatmaps.
+        The array should be structured such that each row corresponds to a rotating speed in `sp_arr` and each column corresponds to an excitation frequency.
+        The shape of the array should be (len(sp_arr), len(sp_arr)).
+    sp_arr : list
+        List of rotating speeds at which the analysis was performed, in rad/s.
+    w : list, optional
+        List of natural frequencies of the metarotor system.
+        If None, the Campbell diagram is not plotted.
+    w_res : list, optional
+        List of natural frequencies of the "resonator modes".
+        If None, the resonator frequencies are not plotted.
+    colorbar_title : str, optional
+        The title of the colorbar in the heatmap.
+        By default 'Response (log)'.
+    saturate_min : float, optional
+        The minimum value for the color scale in the heatmap.
+        If None, the minimum value of the response is used.
+        This can be used to improve the colorscale visualization.
+        By default None.
+    f_min : float, optional
+        The minimum frequency to be considered in the heatmap.
+        If None, the minimum frequency is set to the first element of `sp_arr`.
+        By default None.
+    phase_angle : bool, optional
+        To be used when the differential amplification is provided in phase form.
+        If True, the colorscale is set to 'Phase' and the z-axis limits are set to -180 and 180 degrees.
+        If False, the colorscale is set to 'Plasma' and the z-axis limits are set to the maximum value of the response.
+        By default False.
+    Returns
+    -------
+    plotly.graph_objects.Figure
+        A Plotly figure object containing the Campbell diagram and the Response heatmap.
+        The Campbell diagram shows the natural frequencies of the system, while the heatmap shows the system's response to harmonic excitations.
 
+    """
     w_max = sp_arr[-1]
     w_min = sp_arr[0]
 
@@ -861,6 +1307,26 @@ def plot_camp_heatmap(r, w, sp_arr, w_res=None, colorbar_title='Response (log)',
 
 
 def plot_campbell(w, sp_arr, f_min=None):
+    """Plot the system's Campbell Diagram.
+    The Campbell diagram shows the natural frequencies of the system at different rotating speeds.
+    This function is intended to be used with the results obtained from the `RotorMTM.run_analysis()` method.
+    Parameters
+    ----------
+    w : list
+        List of natural frequencies of the metarotor system.
+        Each element in the list corresponds to a different rotating speed in `sp_arr`.
+    sp_arr : list
+        List of rotating speeds at which the analysis was performed, in rad/s.
+    f_min : float, optional
+        The minimum frequency to be considered in the Campbell diagram.
+        If None, the minimum frequency is set to the first element of `sp_arr`.
+        By default None.
+    Returns
+    -------
+    plotly.graph_objects.Figure
+        A Plotly figure object containing the system's Campbell Diagram.
+        The Campbell diagram shows the natural frequencies of the system at different rotating speeds.
+    """
 
     w_max = sp_arr[-1]
     w_min = sp_arr[0]
@@ -905,6 +1371,27 @@ def plot_campbell(w, sp_arr, f_min=None):
     return fig
 
 def plot_frf(r, sp_arr, width=1.5):
+    """Plot the Frequency Response Function (FRF) of the system.
+    The FRF is plotted in logarithmic scale for better visualization.
+    This function is intended to be used with the results obtained from the `RotorMTM.run_analysis()` method.
+    Parameters
+    ----------
+    r : list
+        List of responses of the system at different rotating speeds and excitation frequencies.
+        Each element in the list corresponds to a different rotating speed in `sp_arr`.
+        The list should contain three elements: bare rotor response, resonators response, and rainbow resonators response.
+    sp_arr : list
+        List of rotating speeds at which the analysis was performed, in rad/s.
+    width : float, optional
+        The width of the lines in the plot.
+        By default 1.5.
+    Returns
+    -------
+    plotly.graph_objects.Figure
+        A Plotly figure object containing the Frequency Response Function (FRF) of the system.
+        The FRF is plotted in logarithmic scale for better visualization.
+    """
+
     
     rsolo = r[0]
     r_det = r[1]
@@ -947,29 +1434,53 @@ def plot_frf(r, sp_arr, width=1.5):
                             size=18))
     return fig
 
-def res_diff(x, n_pos, cross_prod=False, energy=False):
-
-    x1 = x[n_pos]
-
-    if cross_prod:
-        x2 = x[len(x) - len(n_pos):]
-        dx = x2 - x1
-        diff = np.real(x1) * np.imag(dx) - np.real(x2) * np.imag(dx)
-    elif energy:
-        x2 = x[len(x) // 2 - len(n_pos):len(x) // 2]
-        dx = x2 - x1
-        v1 = x[len(x) // 2 + n_pos]
-        diff = np.real(dx) * np.real(v1) + np.imag(dx) * np.imag(v1)
-    else:
-        x2 = x[len(x) - len(n_pos):]
-        diff = x2 / x1
-        # diff = (np.real(diff)) + 1.j * np.abs(np.imag(diff))
-        # diff = np.delete(diff, [7])
-
-    return diff
-
-
-def plot_deflected_shape(rotor,y,n_pos,dof,plot_orbits=None,ys=None,isometric=False):
+def plot_deflected_shape(rotor,
+                         y,
+                         n_pos,
+                         dof,
+                         plot_orbits=None,
+                         ys=None,
+                         isometric=False):
+    """Plot the deflected shape of the rotor and resonators.
+    The resonators are plotted as red dots, and the orbits of the rotor and resonators may be plotted as light blue and magenta lines, respectively.
+    This function is intended to be used with the results obtained from the `RotorMTM.run_analysis()` method.
+    Parameters
+    ----------
+    rotor : ross.Rotor
+        The original ross.Rotor object.
+        The RotorMTM.rotor_solo attribute may be used.
+    y : numpy.ndarray
+        The solution vector containing the displacements of the rotor and resonators.
+        The vector should be structured such that the first rotor.ndof elements correspond to the displacements of rotor DoFs, 
+        and the following remaining n_res * 4 elements correspond to the displacements of the resonators' DoFs.
+    n_pos : list
+        List of indices of the resonators in the solution vector.
+        Each index corresponds to a resonator's nodal position on the rotor.
+        The RotorMTM.n_pos attribute may be used.
+    dof : str
+        The degree of freedom to be plotted.
+        dof = 0, the radial displacements are plotted.
+        dof = 2, the angular displacements are plotted.
+    plot_orbits : list, optional
+        List of indices of the rotor nodes to be plotted as orbits.
+        If rotor nodes with resonators are included, the orbits of the resonators are also plotted.
+        If None, the orbits a standard spacing between plotted nodes is considered.
+        By default None.
+    ys : numpy.ndarray, optional
+        The solution vector containing the displacements of the rotor in a solo analysis.
+        If None, the solo analysis is not plotted.
+        By default None.
+    isometric : bool, optional
+        Whether to plot the deflected shape in isometric view.
+        If True, the plot is in 2D with the Y displacement on the x-axis and the Z displacement on the y-axis.
+        If False, the plot is in 3D with the axial position on the x-axis, Y displacement on the y-axis, and Z displacement on the z-axis.
+        By default False.
+    Returns
+    -------
+    plotly.graph_objects.Figure
+        A Plotly figure object containing the deflected shape of the rotor and resonators.
+        
+    """    
     
     if dof == 'trans':
         dof = 0
@@ -990,7 +1501,7 @@ def plot_deflected_shape(rotor,y,n_pos,dof,plot_orbits=None,ys=None,isometric=Fa
     N = len(l)
     
     if plot_orbits == None:
-        plot_orbits = np.arange(0,N1,N1//9)
+        plot_orbits = np.arange(0, N1, N1//9)
         
     data_res = [trace_function(x=[rotor.nodes_pos[i] for i in n_pos],
                              z=np.real(y[dof+4*N1+1::4]).reshape((N2)),
@@ -1065,8 +1576,36 @@ def plot_deflected_shape(rotor,y,n_pos,dof,plot_orbits=None,ys=None,isometric=Fa
     return fig
 
 def plot_maj_ax(rotor, y, n_pos, dof, ys=None):
-    # if type(y) != list:
-    #     y = [y]
+    """Plot the major axis deflected shape of the rotor and resonators .
+    This function is intended to be used with the results obtained from the `RotorMTM.run_analysis()` method.
+    Parameters
+    ----------
+    rotor : ross.Rotor
+        The original ross.Rotor object.
+        The RotorMTM.rotor_solo attribute may be used.
+    y : numpy.ndarray
+        The solution vector containing the displacements of the rotor and resonators.
+        The vector should be structured such that the first rotor.ndof elements correspond to the displacements of rotor DoFs, 
+        and the following remaining n_res * 4 elements correspond to the displacements of the resonators' DoFs.
+    n_pos : list
+        List of indices of the resonators in the solution vector.
+        Each index corresponds to a resonator's nodal position on the rotor.
+        The RotorMTM.n_pos attribute may be used.
+    dof : str
+        The degree of freedom to be plotted.
+        dof = 0, the radial displacements are plotted.
+        dof = 2, the angular displacements are plotted.
+    ys : numpy.ndarray, optional
+        The solution vector containing the displacements of the rotor in a solo analysis.
+        If None, the solo analysis is not plotted.
+        By default None.
+    Returns
+    -------
+    plotly.graph_objects.Figure
+        A Plotly figure object containing the major axis of the rotor and resonators.
+        The rotor major axis deflected shape is plotted as a line, and the resonators are plotted as red stems.
+        The solo analysis, if provided, is plotted as a dashed line.
+    """    
 
     if dof == 'trans':
         dof = 0
@@ -1126,7 +1665,103 @@ def plot_maj_ax(rotor, y, n_pos, dof, ys=None):
 
     return fig
 
-def scat_iso_2d(x,y,z,mode,name=None,showlegend=True,legendgroup=None,line=None,marker=None):
+def res_diff(x, 
+             n_pos, 
+             cross_prod=False, 
+             energy=False):
+    """Calculate the differential amplification vector for the resonators.
+    The differential amplification vector is calculated as the ratio between the complex displacements of resonator and corresponding rotor node.
+    Alternatively, the a differential amplification evaluation can be calculated in two ways:
+    1. Cross product: Calculates the cross product of the resonators' displacements and the rotor's displacement.
+        This approach attempts to energy transfer between the rotor and resonators.
+    2. Energy: Calculates the maximum elastic potential energy stored in the elatic link between resonator and rotor.
+    Parameters
+    ----------
+    x : numpy.ndarray
+        The solution vector containing the displacements of the rotor and resonators.
+        The vector should be structured such that the first rotor.ndof elements correspond to the displacements of rotor DoFs, 
+        and the following remaining n_res * 4 elements correspond to the displacements of the resonators' DoFs.
+    n_pos : list
+        List of indices of the resonators in the solution vector.
+        Each index corresponds to a resonator's nodal position on the rotor.
+        The RotorMTM.n_pos attribute may be used.
+    cross_prod : bool, optional
+        Whether to calculate the differential amplification vector using the cross product method.
+        By default False.
+    energy : bool, optional
+        Whether to calculate the differential amplification vector using the energy method.        
+        By default False.
+    Returns
+    -------
+    numpy.ndarray
+        The differential amplification vector for the resonators.
+                
+    """
+
+    x1 = x[n_pos]
+
+    if cross_prod:
+        x2 = x[len(x) - len(n_pos):]
+        dx = x2 - x1
+        diff = np.real(x1) * np.imag(dx) - np.real(x2) * np.imag(dx)
+    elif energy:
+        x2 = x[len(x) // 2 - len(n_pos):len(x) // 2]
+        dx = x2 - x1
+        v1 = x[len(x) // 2 + n_pos]
+        diff = np.real(dx) * np.real(v1) + np.imag(dx) * np.imag(v1)
+    else:
+        x2 = x[len(x) - len(n_pos):]
+        diff = x2 / x1
+        # diff = (np.real(diff)) + 1.j * np.abs(np.imag(diff))
+        # diff = np.delete(diff, [7])
+
+    return diff
+
+def scat_iso_2d(x,
+                y,
+                z,
+                mode,
+                name=None,
+                showlegend=True,
+                legendgroup=None,
+                line=None,
+                marker=None):
+    """Create a 2D scatter plot with isometric transformation.
+    This function transforms the input coordinates to create an isometric view.
+    Parameters
+    ----------
+    x : numpy.ndarray
+        The x-coordinates of the data points.
+    y : numpy.ndarray
+        The y-coordinates of the data points.
+    z : numpy.ndarray
+        The z-coordinates of the data points.
+    mode : str
+        The mode of the scatter plot (e.g., 'markers', 'lines').
+    name : str, optional
+        The name of the trace, used for the legend.
+        By default None.
+    showlegend : bool, optional
+        Whether to show the legend for this trace.
+        By default True.
+    legendgroup : str, optional
+        The legend group for this trace.
+        If None, the trace is not grouped.
+        By default None.
+    line : dict, optional
+        The line properties for the trace.
+        If None, default line properties are used.
+        By default None.
+    marker : dict, optional
+        The marker properties for the trace.
+        If None, default marker properties are used.
+        By default None.
+    Returns
+    -------
+    plotly.graph_objects.Scatter
+        A Plotly Scatter object with the transformed coordinates and specified properties.
+    """
+
 
     x = np.array(x)
     y = np.array(y)
