@@ -11,6 +11,40 @@ class IntegrationResults():
                  probe_dof=None,
                  linear_results=None,
                  rigid_results=None):
+        """Class for storing the results of the integration process.
+        Parameters
+        ----------
+        frequency_list : list
+            A list of frequencies at which the results were computed.
+        data_dict_list : list
+            A list of dictionaries containing the results for each frequency.
+        system : Sys_NL, optional
+            The system object used for the integration.
+        probe_dof : list, optional
+            A list of degrees of freedom (DoF) that were probed during the integration.
+        linear_results : dict, optional
+            A dictionary containing the results of the linear system.
+        rigid_results : dict, optional
+            A dictionary containing the results of the rigid body system.
+        Attributes
+        ----------
+        frequency_list : list
+            A list of frequencies at which the results were computed.
+        fl : list
+            Alias for frequency_list.
+        data_dict_list : list
+            A list of dictionaries containing the results for each frequency.
+        ddl : list
+            Alias for data_dict_list.
+        system : Sys_NL, optional
+            The system object used for the integration.
+        probe_dof : list, optional
+            A list of degrees of freedom (DoF) that were probed during the integration.
+        linear_results : dict, optional
+            A dictionary containing the results of the linear system.
+        rigid_results : dict, optional
+            A dictionary containing the results of the rigid body system.
+        """
 
         self.frequency_list = frequency_list
         self.fl = self.frequency_list
@@ -27,7 +61,18 @@ class IntegrationResults():
         self.rigid_results = rigid_results
 
     @classmethod
-    def update_class_object(cls, obj):
+    def update_class_object(cls, 
+                            obj):
+        """Updates the class object with the attributes of another object.
+        Parameters
+        ----------
+        obj : IntegrationResults
+            An instance of IntegrationResults class to update the attributes from.
+        Returns
+        -------
+        IntegrationResults
+            A new instance of IntegrationResults class with updated attributes.
+        """
 
         aux = cls(frequency_list=obj.fl,
                  data_dict_list=obj.ddl,
@@ -47,6 +92,34 @@ class IntegrationResults():
                          omg,
                          n_points=10,
                          cut=1):
+        """Computes the Poincaré section of a dynamical system.
+        Parameters
+        ----------
+        x : array_like
+            The state vector of the system.
+        t : array_like
+            The time vector corresponding to the state vector.
+            This vector must have uniform time steps.
+        omg : float
+            The base frequency at which the Poincaré section is computed.
+        n_points : int, optional
+            The number of periods to include in the Poincaré section.
+        cut : int, optional
+            The factor by which to cut the time vector.
+            The result will consider only the 1/cut last time steps.
+            This is useful to remove residual transient responses from the results.
+            Default is 1 (no cut).
+        Returns
+        -------
+        array_like
+            The Poincaré section of the system.
+        Notes
+        -----
+        The Poincaré section is computed by interpolating the state vector at
+        regular intervals determined by the frequency.
+        The time vector is cut to reduce the number of points considered.
+        The function returns the last n_points of the Poincaré section.
+        """
 
         dt = t[1] - t[0]
         T = 2 * np.pi / omg
@@ -70,6 +143,16 @@ class IntegrationResults():
         return pc
 
     def _find_frequency_index(self, f):
+        """Finds the index of the frequency in the frequency list.
+        Parameters
+        ----------
+        f : float
+            The frequency to find in the frequency list.
+        Returns
+        -------
+        int
+            The index of the frequency in the frequency list.
+        """
 
         a = np.array(self.fl) - f
         i = np.argmin(abs(a))
@@ -81,6 +164,23 @@ class IntegrationResults():
                      font_size=30,
                      maintain_proportions=False,
                      colorbar_above=False):
+        """
+        Adjusts the layout of the Plotly figure to a standard layout.
+        Parameters
+        ----------
+        fig : plotly.graph_objs.Figure
+            The Plotly figure to adjust.
+        font_size : int, optional
+            The font size for the figure. Default is 30.
+        maintain_proportions : bool, optional
+            Whether to maintain the proportions of the figure. Default is False.
+        colorbar_above : bool, optional
+            Whether to place the colorbar above the heatmap. Default is False.
+        Returns
+        -------
+        plotly.graph_objs.Figure
+            The adjusted Plotly figure.
+        """
 
         if not maintain_proportions:
             fig.update_layout(width=800,
@@ -116,6 +216,17 @@ class IntegrationResults():
         return fig
 
     def _adjust_plot3d(self, fig):
+        """
+        Adjusts the layout of the Plotly 3D figure to a standard layout.
+        Parameters
+        ----------
+        fig : plotly.graph_objs.Figure
+            The Plotly 3D figure to adjust.
+        Returns
+        -------
+        plotly.graph_objs.Figure
+            The adjusted Plotly 3D figure.
+        """
 
         fig.update_layout(width=1200,
                           height=1000,
@@ -139,6 +250,34 @@ class IntegrationResults():
     def _calc_amplitude(x,
                         cut=2,
                         amplitude_units='rms'):
+        """Calculates the amplitude of a signal.
+        Parameters
+        ----------
+        x : array_like
+            The signal for which the amplitude is to be calculated.
+        cut : int, optional
+            The factor by which to cut the signal.
+            The result will consider only the 1/cut last time steps.
+            This should be used to remove residual transient responses from the results.
+            Default is 2.
+        amplitude_units : str, optional
+            The units in which the amplitude is to be calculated.
+            Can be one of {'rms', 'max_displacement', 'pk', 'pk-pk'}.
+            Default is 'rms'.
+        Returns
+        -------
+        float
+            The calculated amplitude of the signal.
+        Notes
+        -----
+        This function assumes that the input signal is one-dimensional.
+        If the input signal is multi-dimensional, it will calculate the amplitude for each dimension separately.
+        The amplitude is calculated based on the specified units:
+        - 'rms': Root Mean Square of the last 1/cut part of the signal.
+        - 'max_displacement': Maximum displacement of the last 1/cut part of the signal.
+        - 'pk': Peak value of the last 1/cut part of the signal.
+        - 'pk-pk': Peak-to-peak value of the last 1/cut part of the signal.
+        """
 
         if amplitude_units == 'rms':
             n_cut = int(len(x) / cut)
@@ -188,6 +327,48 @@ class IntegrationResults():
                             return_complex=False,
                             backward_vector=False
                             ):
+        """
+        Calculates the full spectrum of a signal.
+        Parameters
+        ----------
+        t : array_like
+            The time vector corresponding to the signal.
+        x : array_like
+            The x-component of the signal.
+        y : array_like
+            The y-component of the signal.
+        cut : int, optional
+            The factor by which to cut the signal.
+            The result will consider only the 1/cut last time steps.
+            This should be used to remove residual transient responses from the results.
+            Default is 2.
+        hanning : bool, optional
+            Whether to apply a Hanning window to the signal before calculating the spectrum.
+            Default is True.
+        synch_freq : float, optional
+            The frequency at which the signal is synchronized.
+            If provided, the spectrum will be calculated to minimize leakage at this
+            frequency and its multiples.
+            Default is None.
+        return_complex : bool, optional
+            Whether to return the complex spectrum.
+            If True, the function will return the complex spectrum.
+            If False, the function will return the absolute value of the spectrum.
+            Default is False.
+        backward_vector : bool, optional
+            Whether to return the backward vector of the spectrum.
+            If True, the function will return the backward vector.
+            If False, the function will return the backward component.
+            Default is False.
+        Returns
+        -------
+        w : array_like
+            The frequency vector corresponding to the spectrum.
+        spectrum : array_like
+            The calculated spectrum (complex or absolute value).
+            The shape of the spectrum should matches the frequency vector w.
+        
+        """
 
         w, spec_x = self._calc_fourier(t=t,
                                        x=x,
@@ -223,6 +404,42 @@ class IntegrationResults():
                       synch_freq=None,
                       return_complex=False
                       ):
+        """
+        Calculates the Fourier transform of a signal.
+        Parameters
+        ----------
+        t : array_like
+            The time vector corresponding to the signal.
+        x : array_like
+            The signal to transform.
+        cut : int, optional
+            The factor by which to cut the signal.
+            The result will consider only the 1/cut last time steps.
+            This should be used to remove residual transient responses from the results.
+            Default is 2.
+        hanning : bool, optional
+            Whether to apply a Hanning window to the signal before calculating the spectrum.
+            Default is True.
+        synch_freq : float, optional
+            The frequency at which the signal is synchronized.
+            If provided, the spectrum will be calculated to minimize leakage at this
+            frequency and its multiples.
+            Default is None.
+        return_complex : bool, optional
+            Whether to return the complex spectrum.
+            If True, the function will return the complex spectrum.
+            If False, the function will return the absolute value of the spectrum.
+            Default is False.
+
+        Returns
+        -------
+        w : array_like
+            The frequency vector corresponding to the spectrum.
+        spectrum : array_like
+            The calculated spectrum (complex or absolute value).
+            The shape of the spectrum should matches the frequency vector w.
+
+        """
 
         n_cut = int(len(x) / cut)
         dt = t[1] - t[0]
@@ -258,6 +475,27 @@ class IntegrationResults():
                                  dof=None,
                                  cut=2,
                                  n_points=20):
+        """Plots the bifurcation diagram of the of the response.
+        Parameters
+        ----------
+        dof : list, optional
+            The degrees of freedom to include in the plot. DoFs names should be provided as strings.
+            If None, all degrees of freedom will be included.
+        cut : int, optional
+            The factor by which to cut the signal.
+            The result will consider only the 1/cut last time steps.
+            This should be used to remove residual transient responses from the results.
+            Default is 2.
+        n_points : int, optional
+            The number of points to use in the Poincaré section.
+            Default is 20.
+
+        Returns
+        -------
+        fig : plotly.graph_objs.Figure
+            The resulting figure object.
+
+        """
 
         fig = go.Figure()
         if dof is None:
@@ -275,7 +513,7 @@ class IntegrationResults():
                 data = self.poincare_section(x=d[k],
                                              t=d['time'],
                                              omg=f,
-                                             n_points = n_points,
+                                             n_points=n_points,
                                              cut=cut
                                              )
 
@@ -306,6 +544,30 @@ class IntegrationResults():
                  cut=2,
                  amplitude_units='rms',
                  frequency_units='rad/s'):
+        """Plots the frequency response function (FRF) of the system.
+        Parameters
+        ----------
+        dof : list, optional
+            The degrees of freedom to include in the plot. DoFs names should be provided as strings.
+            If None, all degrees of freedom will be included.
+        cut : int, optional
+            The factor by which to cut the signal.
+            The result will consider only the 1/cut last time steps.
+            This should be used to remove residual transient responses from the results.
+            Default is 2.
+        amplitude_units : str, optional
+            The units to use for the amplitude. Can be 'rms' or 'max_displacement'.
+            Default is 'rms'.
+        frequency_units : str, optional
+            The units to use for the frequency. Can be 'rad/s' or 'RPM'.
+            Default is 'rad/s'.
+
+        Returns
+        -------
+        fig : plotly.graph_objs.Figure
+            The resulting figure object.
+
+        """
 
         fig = go.Figure()
         if dof is None:
@@ -352,6 +614,19 @@ class IntegrationResults():
     def plot_waveform(self,
                       frequency,
                       dof=None):
+        """Plots the waveform of the response at a given frequency.
+        Parameters
+        ----------
+        frequency : float
+            The frequency at which to plot the waveform.
+        dof : list, optional
+            The degrees of freedom to include in the plot. DoFs names should be provided as strings.
+            If None, all degrees of freedom will be included.
+        Returns
+        -------
+        fig : plotly.graph_objs.Figure
+            The resulting figure object.    
+        """
 
         fig = go.Figure()
 
@@ -380,6 +655,25 @@ class IntegrationResults():
                    frequency,
                    dof=None,
                    cut=1):
+        """Plots the orbit of the response at a given frequency.
+        Parameters
+        ----------
+        frequency : float
+            The frequency at which to plot the orbit.
+        dof : list, optional
+            A list of tuples. Each tuple must contain the names of X and Y DoFs for the desired orbit.
+            e.g. [("last_x", "last_y"), ("brg_x", "brg_y")]
+            If None, the first two DoFs will be used as a X-Y pair.
+        cut : int, optional
+            The factor by which to cut the signal.
+            The result will consider only the 1/cut last time steps.
+            This should be used to remove residual transient responses from the results.
+            Default is 1 (no cut).
+        Returns
+        -------
+        fig : plotly.graph_objs.Figure
+            The resulting figure object.
+        """
 
         fig = go.Figure()
 
@@ -433,6 +727,19 @@ class IntegrationResults():
         return fig
     
     def _calc_velocity(self, x, t):
+        """Calculates the velocity of a signal based on its time and displacement data.
+        Parameters
+        ----------
+        x : numpy.ndarray
+            The displacement data.
+        t : numpy.ndarray
+            The time data.
+        Returns
+        -------
+        v : numpy.ndarray
+            The velocity data.
+        
+        """
 
         v = 0 * x
 
@@ -450,6 +757,22 @@ class IntegrationResults():
                             frequency,
                             dof=None,
                             cut=1):
+        """Plots the Poincaré section of the response at a given frequency.
+        Parameters
+        ----------
+        frequency : float
+            The frequency at which to plot the Poincaré section.
+        dof : list, optional
+            A list of tuples. Each tuple must contain the names of X and Y DoFs for the desired Poincaré section.
+            e.g. [("last_x", "last_y"), ("brg_x", "brg_y")]
+            If None, the first two DoFs will be used as a X-Y pair.
+        cut : int, optional
+            The factor by which to downsample the data before plotting. Default is 1 (no cut).
+        Returns
+        -------
+        fig : plotly.graph_objs.Figure
+            The figure object containing the Poincaré section plot.
+        """
 
         fig = go.Figure()
 
@@ -513,6 +836,33 @@ class IntegrationResults():
                       hanning=True,
                       cut=2,
                       max_frequency=None):
+        """Plots the frequency spectrum of the response at a given frequency.
+        Parameters
+        ----------
+        dof : list
+            A list of degrees of freedom (DoF) to include in the plot.
+            It must be a list of tuples containing X-Y pairs in case full_spectrum=True.
+        frequency : float
+            The frequency at which to plot the spectrum.
+        full_spectrum : bool, optional
+            Whether to plot the full spectrum (including negative frequencies).
+            If True, the spectrum will include both backward and forward components.
+            Default is False.
+        hanning : bool, optional
+            Whether to apply a Hanning window to the signal before calculating the spectrum.
+            Default is True.
+        cut : int, optional
+            The factor by which to cut the signal.
+            Default is 2.
+        max_frequency : float, optional
+            The maximum frequency to include in the plot.
+            If None, the maximum frequency will be determined automatically.
+            Default is None.
+        Returns
+        -------
+        fig : plotly.graph_objs.Figure
+            The figure object containing the frequency spectrum plot.
+        """
 
         fig = go.Figure()
 
@@ -583,6 +933,36 @@ class IntegrationResults():
                               full_spectrum=False,
                               hanning=True,
                               cut=2):
+        """Plots the frequency spectrum heatmap of the response.
+        Parameters
+        ----------
+        dof : list
+            The degrees of freedom to plot.
+            It must be a list of tuples containing X-Y pairs in case full_spectrum=True.
+        max_freq : float, optional
+            The maximum frequency to include in the plot.
+            If None, the maximum frequency will be determined automatically.
+            Default is None.
+        max_amp : float, optional
+            The maximum amplitude to include in the plot.
+            If None, the maximum amplitude will be determined automatically.
+            Default is None.
+        full_spectrum : bool, optional
+            Whether to plot the full spectrum (including backward and forward components).
+            Default is False.
+        hanning : bool, optional
+            Whether to apply a Hanning window to the signal before calculating the spectrum.
+            Default is True.
+        cut : int, optional
+            The factor by which to cut the signal.
+            The result will consider only the 1/cut last time steps.
+            This should be used to remove residual transient responses from the results.
+            Default is 2.
+        Returns
+        -------
+        fig : plotly.graph_objs.Figure
+            The figure object containing the heatmap and the synchronous line.
+        """
 
         fig = go.Figure()
         t = self.ddl[0]['time']
@@ -674,6 +1054,38 @@ class IntegrationResults():
                        hanning=True,
                        log_amplitude=False,
                        cut=2):
+        """Plots the 3D cascade plot of the response.
+        Parameters
+        ----------
+        dof : list
+            Degrees of freedom to plot.
+            It must be a list of tuples containing X-Y pairs in case full_spectrum=True.
+        max_freq : float, optional
+            Maximum frequency to plot.
+            Default is None, which means the maximum frequency will be determined automatically.
+        max_amp : float, optional
+            Maximum amplitude to plot.
+            Default is None, which means the maximum amplitude will be determined automatically.
+        full_spectrum : bool, optional
+            Whether to plot the full spectrum (including backward and forward components).
+            Default is False.
+        hanning : bool, optional
+            Whether to apply a Hanning window to the data.
+            Default is True.
+        log_amplitude : bool, optional
+            Whether to plot the logarithm of the amplitude.
+            Default is False.
+        cut : float, optional
+            The factor by which to cut the signal.
+            The result will consider only the 1/cut last time steps.
+            This should be used to remove residual transient responses from the results.
+            Default is 2.
+
+        Returns
+        -------
+        fig : plotly.graph_objs.Figure
+            The resulting figure.
+        """
 
         fig = go.Figure()
         t = self.ddl[0]['time']
@@ -737,6 +1149,55 @@ class IntegrationResults():
                    synch_freq=None,
                    backward_vector=False,
                    full_output=False):
+        """Calculates the amplification vector between oscillators and base structure.
+
+        Refer to Brandão et al. (2022) for further details.
+        https://doi.org/10.1016/j.jsv.2022.116982
+        Parameters
+        ----------
+        t : array_like
+            Time vector.
+        x : tuple of array_like
+            Displacement time series of oscillator and base structure in X direction.
+            The tuple should be arranged as (x_oscillator, x_base).
+        y : tuple of array_like, optional
+            Displacement time series of oscillator and base structure in Y direction.
+            The tuple should be arranged as (y_oscillator, y_base).
+            Only required if a full spectrum is to be computed.
+            Default is None.
+        cut : float, optional
+            The factor by which to cut the signal.
+            The result will consider only the 1/cut last time steps.
+            Default is 2.
+        hanning : bool, optional
+            Whether to apply a Hanning window to the signal.
+            Default is True.
+        synch_freq : float, optional
+            Frequency to which the signals will be synchronized.
+            Default is None.
+        backward_vector : bool, optional
+            Whether to use the backward vector for the calculation.
+            If False, uses backward component instead of backward vector.
+            Default is False.
+        full_output : bool, optional
+            Whether to return the full output of the calculation.
+            Full output includes the spectrum data for both oscillator and base DoFs.
+            Default is False.
+        Returns
+        -------
+        w : array_like
+            Frequency vector corresponding to the spectrum.
+        diff : array_like
+            Difference between the two spectra.
+            The result will consider only the 1/cut last frequency steps.
+        spec_1 : array_like
+            Spectrum of the first input (oscillator).
+            Only if full_output is True.
+        spec_2 : array_like
+            Spectrum of the second input (base structure).
+            Only if full_output is True.
+        """
+
 
         if y is not None:
             w, spec_1 = self._calc_full_spectrum(t=t,
@@ -794,6 +1255,62 @@ class IntegrationResults():
                       backward_vector=False,
                       plot_3d=False
                       ):
+        """Plots the differential amplification map of the response.
+
+        Parameters
+        ----------
+        dof : list
+            List of tuples, each representing one pair of DoFs to consider in the analysis.
+            Each degree of freedom should be a tuple with the format, e.g. ('oscillator_x', 'base_x').
+        dof_y : list, optional
+            List of degrees of freedom to consider for the Y component.
+            Must have a similar structure to `dof`.
+            Needed only if full_spectrum=True.
+            Default is None.
+        mode : str, optional
+            The mode of the plot. Can be 'amp', 'angle', or 'composition'.
+            'amp' - Plot the amplitude of the differential response.
+            'angle' - Plot the phase angle of the differential response.
+            'composition' - Plot the composition of the differential response.
+            Default is 'amp'.
+        min_freq : float, optional
+            Minimum frequency to consider. 
+            If None, no minimum frequency will be applied.
+            Default is None.
+        max_freq : float, optional
+            Maximum frequency to consider. 
+            If None, no maximum frequency will be applied.
+            Default is None.
+        max_amp : float, optional
+            Maximum amplitude to consider. 
+            If None, no maximum amplitude will be applied.
+            Default is None.
+        full_spectrum : bool, optional
+            Whether to plot the full spectrum (including backward and forward components).
+            Default is False.
+        hanning : bool, optional
+            Whether to apply a Hanning window to the signals before computing the Fourier transform.
+            Default is False.
+        cut : int, optional
+            The factor by which to cut the signal.
+            The result will consider only the 1/cut last time steps.
+            Default is 2.            
+        log_mode : bool, optional
+            Whether to use logarithmic scaling for the amplitude. 
+            Default is False.
+        backward_vector : bool, optional
+            Whether to use the backward vector for the calculation.
+            If False, uses backward component instead of backward vector.
+            Default is False.
+        plot_3d : bool, optional
+            Whether to plot the data in 3D.
+            If True, the data will be plotted in 3D.
+            Default is False.
+        Returns
+        -------
+        fig : plotly.graph_objs.Figure
+            The figure object containing the plot.  
+        """
 
         fig = go.Figure()
         t = self.ddl[0]['time']
@@ -982,9 +1499,6 @@ class IntegrationResults():
 
         return fig
     
-    
-
-
 class LinearResults():
 
     def __init__(self,
@@ -992,6 +1506,39 @@ class LinearResults():
                  res_forward,
                  res_backward,
                  system):
+        """Initializes the LinearResults class with frequency list, forward and backward results, and system information.
+        Parameters
+        ----------
+        frequency_list : list
+            List of frequencies at which the results are computed.
+        res_forward : dict
+            Dictionary containing the forward excitation results.
+        res_backward : dict
+            Dictionary containing the backward excitation results.
+        system : object
+            System information object.
+
+        Attributes
+        ----------
+        frequency_list : list
+            List of frequencies at which the results are computed.
+        res_forward : dict
+            Dictionary containing the forward excitation results.
+        res_backward : dict
+            Dictionary containing the backward excitation results.
+        system : object
+            System information object.
+        rf : dict
+            Forward excitation results.
+        rb : dict
+            Backward excitation results.
+        fl : list
+            Frequency list.
+        Notes
+        -----
+        This class is used to store the results of the linear analysis.
+
+        """
 
         self.frequency_list = frequency_list
         self.res_forward = res_forward
@@ -1003,6 +1550,17 @@ class LinearResults():
         self.fl = self.frequency_list
 
     def _find_frequency_index(self, f):
+        """
+        Finds the index of the closest frequency in the frequency list.
+        Parameters
+        ----------
+        f : float
+            The frequency to find in the frequency list.
+        Returns
+        -------
+        int
+            The index of the closest frequency in the frequency list.
+        """
 
         a = np.array(self.fl) - f
         i = np.argmin(abs(a))
@@ -1012,6 +1570,22 @@ class LinearResults():
     def _calc_amplitude(self,
                         x,
                         amplitude_units='rms'):
+        """
+        Calculates the amplitude of a signal.
+        Parameters
+        ----------
+        x : array_like
+            Input signal.
+        amplitude_units : str, optional
+            The units of the amplitude to be calculated.
+            Can be one of the following: 'max_displacement', 'rms', 'pk', 'pk-pk'.
+        Returns
+        -------
+        float
+            The amplitude of the signal.
+        
+
+        """
 
         t = 5 * 2 * np.pi * np.linspace(0, 1, 50)
         if amplitude_units == 'max_displacement':
@@ -1038,6 +1612,27 @@ class LinearResults():
                  whirl='both',
                  amplitude_units='rms',
                  frequency_units='rad/s'):
+        """Plots the frequency response function (FRF) for the given degrees of freedom (DoF).
+        Parameters
+        ----------
+        dof : list, optional
+            List of degrees of freedom (DoF) to plot. If None, all DoFs are plotted.
+        whirl : str, optional
+            The type of whirl to consider. Can be one of the following: 'both', 'forward', 'backward', 'unbalance'.
+            Default is 'both'.
+        amplitude_units : str, optional
+            The units of the amplitude to be plotted. Can be one of the following: 'max_displacement', 'rms', 'pk', 'pk-pk'.
+            Default is 'rms'.
+        frequency_units : str, optional
+            The units of the frequency to be plotted. Can be one of the following: 'rad/s', 'RPM'.
+            Default is 'rad/s'.
+        Returns
+        -------
+        fig_1 : plotly.graph_objs.Figure
+            Figure object containing the forward excitation plot.
+        fig_2 : plotly.graph_objs.Figure
+            Figure object containing the backward excitation plot.
+        """
 
         fig_1 = go.Figure()
         fig_2 = go.Figure()
@@ -1111,6 +1706,25 @@ class LinearResults():
                    dof,
                    whirl='forward',
                    f=1):
+        """Plots the orbit plot for the given frequency and degrees of freedom (DoF).
+        Parameters
+        ----------
+        frequency : float
+            The frequency at which to plot the orbit.
+        dof : list
+            The degrees of freedom (DoF) to consider for the orbit plot.
+            Each element should be a tuple (x, y) representing the DoF.
+        whirl : str, optional
+            The type of whirl to consider. Can be one of the following: 'forward', 'backward', 'unbalance'.
+            Default is 'forward'.
+        f : float, optional
+            The scaling factor for the orbit plot.
+            Default is 1.
+        Returns
+        -------
+        fig : plotly.graph_objs.Figure
+            The figure containing the orbit plot.
+        """
 
         fig = go.Figure()
         

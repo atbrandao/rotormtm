@@ -10,7 +10,17 @@ from .results import LinearResults
 
 class RotorMTM:
 
-    def __init__(self,rotor,n_pos,dk_r,k0,k1,var=0,var_k=0,p_damp=1e-4,ge=True,exp_var=1):
+    def __init__(self,
+                 rotor,
+                 n_pos,
+                 dk_r,
+                 k0,
+                 k1,
+                 var=0,
+                 var_k=0,
+                 p_damp=1e-4,
+                 ge=True,
+                 exp_var=1):
         """ A metarotor object
 
         This class represents a metarotor, which is a gyroscopic metastructure
@@ -910,8 +920,7 @@ class RotorMTM:
                       sp=0,
                       n_harm=10,
                       nu=1,
-                      N=1,
-                      cp=1e-4):
+                      N=1):
         """Create a nonlinear system object from the linear metarotor system object.
         This method constructs a harmbal.Sys_NL object that represents a nonlinear version of the metarotor system.
         This nonlinear system class considers bi-stable Duffin type nonlinearity for the resonators.
@@ -941,11 +950,9 @@ class RotorMTM:
             For nu = 2 the half harmonics, 0.5X, 1.5X, 2.5X etc., are also considered.
             By default 1.
         N : int, optional
-            The number of full periods considered in Harmonic Balance time-domain steps.
+            Time domain refinement for the Harmonic Balance method.
             By default 1.
-        cp : float, optional
-            The propostional damping coefficient for the nonlinear system.
-            By default 1e-4.
+        
         Returns
         -------
         harmbal.Sys_NL
@@ -954,15 +961,11 @@ class RotorMTM:
 
         """
 
-
         M = self.M()
         beta0 = -self.k0 / 2
         beta1 = -self.k1 / 2
         K_lin = self._rotor.K(sp)
-        aux = self.p_damp
-        self.p_damp = cp
         C = self.C(sp) + self.G() * sp
-        self.p_damp = aux
 
         Snl = 0 * M #self.K(sp, connectivity_matrix=dof)
         alpha = 0
@@ -985,26 +988,22 @@ class RotorMTM:
                 K_lin += beta1 * self.K(sp, connectivity_matrix=[i + 2])
                 x_eq = x
 
-#        if x_eq1 is not None:
-#            alpha1 = -beta1 / x_eq1 ** 2
-#            if x_eq0 is None:
-#                x_eq = x_eq1
-#                alpha = alpha1
-#            Snl += self.K(sp, connectivity_matrix=1)# * (alpha1/alpha) ** (1/3)
-#            K_lin += beta1 * self.K(sp, connectivity_matrix=1)
-#            beta = beta1
-#        else:
-#            K_lin += self.k1 * self.K(sp, connectivity_matrix=[2, 3])
-
-        Sys = Sys_NL(M=M, K=K_lin, Snl=Snl, beta=0, alpha=alpha,
-                             n_harm=n_harm, nu=nu, N=N, C=C, rotor=self)
-
+        Sys = Sys_NL(
+            M=M, 
+            K=K_lin, 
+            Snl=Snl, 
+            beta=0, 
+            alpha=alpha,
+            n_harm=n_harm, 
+            nu=nu, 
+            N=N, 
+            C=C, 
+            x_eq=x_eq,
+            rotor=self
+        )
         Sys.dof_nl = [i for i in range(self.N2, len(Snl)) if Snl[i, i] != 0]
-        Sys.x_eq = x_eq
-
-        return Sys
-    
-
+        
+        return Sys   
 
 def plot_diff_modal(w, 
                     diff, 
@@ -1137,8 +1136,7 @@ def plot_diff_modal(w,
     if n_plot is None:
         
        
-        fig = go.Figure(data=data)
-        
+        fig = go.Figure(data=data)        
             
         fig.update_layout(title={'xanchor': 'center',
                                   'x': 0.4,
