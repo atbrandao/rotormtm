@@ -153,36 +153,36 @@ tf = 2
 r = rotor_dict['r_rigid']
 Sys_rig = r.create_Sys_NL(x_eq0=(1e-3, None),
                        sp=sp_arr[0],
-                       cp=1e-4,
+                    #    cp=1e-4,
                        n_harm=5)
 
 # Transtun
 r = rotor_dict['r_det_transtun']
 Sys_trans = r.create_Sys_NL(x_eq0=(2 * 1e-3, None),
                        sp=sp_arr[0],
-                       cp=1e-4,
+                    #    cp=1e-4,
                        n_harm=5)
 
 Sys_trans05 = r.create_Sys_NL(x_eq0=(0.5 * 1e-3, None),
                        sp=sp_arr[0],
-                       cp=1e-4,
+                    #    cp=1e-4,
                        n_harm=5)
 
 r = rotor_dict['r_var1_transtun']
 Sys_trans_var = r.create_Sys_NL(x_eq0=(2 * 1e-3, None),
                        sp=sp_arr[0],
-                       cp=1e-4,
+                    #    cp=1e-4,
                        n_harm=5)
 
 Sys_trans_var05 = r.create_Sys_NL(x_eq0=(0.5 * 1e-3, None),
                        sp=sp_arr[0],
-                       cp=1e-4,
+                    #    cp=1e-4,
                        n_harm=5)
 
 x0_arr = [3, 4, 5, 6]
 Sys_arr = [r.create_Sys_NL(x_eq0=(a * 1e-3, None),
                        sp=sp_arr[0],
-                       cp=1e-4,
+                    #    cp=1e-4,
                        n_harm=5) for a in x0_arr]
 mult = 1
 
@@ -190,7 +190,7 @@ mult = 1
 r = rotor_dict['r_det_flextun']
 Sys_flex = r.create_Sys_NL(x_eq1=(1 * np.pi / 180, None),
                        sp=sp_arr[0],
-                       cp=1e-4,
+                    #    cp=1e-4,
                        n_harm=5)
 #mult = 1
 
