@@ -4,18 +4,25 @@ Esta pasta contém as interfaces gráficas desenvolvidas em Streamlit para traba
 
 ## Arquivos Disponíveis
 
-### Interfaces Atualizadas (Recomendadas)
-- **`interface_step1.py`** - Interface da Etapa 1: Carregamento de rotor e configuração de ressonadores
-- **`interface_step2.py`** - Interface da Etapa 2: Análise FRF e visualização de resultados
-
-### Interfaces Anteriores (Referência)
-- **`interface_rotor_step1.py`** - Versão anterior da etapa 1
-- **`interface_rotor_step2.py`** - Versão anterior da etapa 2
+### Interfaces Funcionais
+- **`interface_rotor_step1.py`** - Interface da Etapa 1: Carregamento de rotor e configuração de ressonadores
+- **`interface_rotor_step2.py`** - Interface da Etapa 2: Análise FRF e visualização de resultados
 
 ### Arquivos de Dados
 - **`rotor_mtm_3res.pkl`** - Arquivo exemplo com RotorMTM configurado com 3 ressonadores
+- **`rotor_system_3res.pkl`** - Arquivo exemplo adicional para testes
 
 ## Como Usar
+
+### Estrutura da Pasta
+```
+gui/
+├── interface_rotor_step1.py    # Interface Etapa 1 (funcionando)
+├── interface_rotor_step2.py    # Interface Etapa 2 (funcionando)  
+├── README.md                   # Esta documentação
+├── rotor_mtm_3res.pkl         # Exemplo RotorMTM (3 ressonadores)
+└── rotor_system_3res.pkl      # Exemplo adicional para testes
+```
 
 ### Pré-requisitos
 Certifique-se de que a biblioteca `rotor_mtm` está instalada e acessível:
@@ -28,12 +35,12 @@ from rotor_mtm.results import LinearResults
 
 **Etapa 1 - Configuração do Sistema:**
 ```bash
-streamlit run gui/interface_step1.py
+streamlit run gui/interface_rotor_step1.py
 ```
 
 **Etapa 2 - Análise FRF:**
 ```bash
-streamlit run gui/interface_step2.py
+streamlit run gui/interface_rotor_step2.py
 ```
 
 ## Fluxo de Trabalho
@@ -93,7 +100,7 @@ Se houver erro ao importar `rotor_mtm`, verifique:
 
 ### Arquivo não Reconhecido
 Se a Etapa 2 não reconhecer o arquivo da Etapa 1:
-- Use `interface_step1.py` para gerar arquivos compatíveis
+- Verifique se o arquivo foi gerado corretamente pela `interface_rotor_step1.py`
 - Verifique se o arquivo contém objeto RotorMTM válido
 - Teste com arquivo exemplo: `rotor_mtm_3res.pkl`
 
