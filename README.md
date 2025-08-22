@@ -14,7 +14,6 @@ A Python library for rotor analysis with gyroscopic metastructures, based on the
 - **Vibration control** through selective frequency attenuation
 - **Dynamic absorber design** for rotating machinery
 - **Forced response analysis** with synchronous and asynchronous excitation
-- **Parameter optimization** of resonators for maximum efficiency
 
 ## 🔬 Theoretical Foundation
 
@@ -53,16 +52,9 @@ RotorMTM/
 │   ├── interface_rotor_step1.py # Interface: System configuration
 │   ├── interface_rotor_step2.py # Interface: FRF analysis
 │   └── README.md               # Interface documentation
-├── examples/                   # Examples and case studies
-│   ├── app_campbell.py         # Campbell diagrams
-│   ├── generate_plots.py       # Plot generation
-│   └── *.ipynb                # Jupyter notebooks
-├── results/                    # Analysis results
 ├── scripts/                    # Auxiliary scripts
-├── tools/                      # Analysis tools
-├── Multistage Pump/           # Case study: Multistage pump
-├── Turboexpander/             # Case study: Turboexpander
-└── README.md                  # This file
+├── Turboexpander Compressor/   # Case study: Turboexpander
+└── README.md                   # This file
 ```
 
 ## 🚀 Installation
@@ -221,23 +213,6 @@ streamlit run gui/interface_rotor_step2.py
 - Results visualization
 - Comparative analysis with solo rotor
 
-## 📊 Case Studies
-
-### 1. Multistage Pump (`Multistage Pump/`)
-- Analysis of 5-stage centrifugal pump
-- Resonator optimization for instability control
-- Comparison with experimental data
-
-### 2. Turboexpander (`Turboexpander/`)
-- Turboexpander-compressor system
-- High-speed vibration control
-- Nonlinear effects analysis
-
-### 3. Compressor (`Turboexpander Compressor/`)
-- Industrial centrifugal compressor
-- Optimized dynamic absorbers
-- Field data validation
-
 ## 📈 Advanced Features
 
 ### Nonlinear Analysis
@@ -275,66 +250,19 @@ metarotor_rainbow = RotorMTM(
 )
 ```
 
-### Parameter Optimization
-```python
-# Objective function: minimize response at critical frequency
-def objective_function(params):
-    k0, k1 = params
-    temp_rotor = RotorMTM(rotor, n_pos, resonators, k0, k1)
-    results = temp_rotor.calc_frf(critical_speeds, forces, probe_dof)
-    return np.max(np.abs(results.rf['Node_0_x']))
-
-# Optimization with scipy
-from scipy.optimize import minimize
-result = minimize(
-    objective_function,
-    x0=[1e6, 1e3],
-    bounds=[(1e4, 1e8), (1e1, 1e5)],
-    method='L-BFGS-B'
-)
-```
-
 ## 📚 Academic References
 
 ### Main Articles
 
 1. **Brandão, A.T., et al. (2022)**  
-   *"Gyroscopic metastructures for vibration control in rotating machinery"*  
+   *"Rainbow gyroscopic disk metastructures for broadband vibration attenuation in rotors"*  
    Journal of Sound and Vibration, 516, 116982.  
    DOI: [10.1016/j.jsv.2022.116982](https://doi.org/10.1016/j.jsv.2022.116982)
 
 2. **Brandão, A.T., et al. (2025)**  
-   *"Nonlinear dynamics of gyroscopic metastructures with bi-stable resonators"*  
-   Nonlinear Dynamics (aceito para publicação)  
+   *"Modally matched bistable disk metastructure for vibration attenuation in rotors: bandwidth widening and chaos"*  
+   Nonlinear Dynamics
    DOI: [10.1007/s11071-025-11597-z](https://doi.org/10.1007/s11071-025-11597-z)
-
-3. **Hussein, M.I., Leamy, M.J., Ruzzene, M. (2014)**  
-   *"Dynamics of phononic materials and structures: Historical origins, recent progress, and future outlook"*  
-   Applied Mechanics Reviews, 66(4), 040802.
-
-### Foundational Theory
-
-4. **Vangbo, M. (1998)**  
-   *"An analytical analysis of a compressed bistable buckled beam"*  
-   Sensors and Actuators A: Physical, 69(3), 212-216.
-
-5. **Genta, G. (2005)**  
-   *"Dynamics of Rotating Systems"*  
-   Springer Science & Business Media.
-
-6. **Lalanne, M., Ferraris, G. (1998)**  
-   *"Rotordynamics Prediction in Engineering"*  
-   John Wiley & Sons.
-
-### Applications and Methods
-
-7. **Yu, D., et al. (2006)**  
-   *"Flexural vibration band gaps in Timoshenko beams with locally resonant structures"*  
-   Journal of Applied Physics, 100(12), 124901.
-
-8. **Ma, G., Sheng, P. (2016)**  
-   *"Acoustic metamaterials: From local resonances to broad horizons"*  
-   Science Advances, 2(2), e1501595.
 
 ## 🤝 Contributions
 
@@ -354,7 +282,7 @@ Contributions are welcome! Please:
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE.md) file for details.
 
 ## 👥 Authors
 
@@ -363,12 +291,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Contact
 
 For questions, suggestions, or collaborations:
-- **Email**: [alexandre.brandao@petrobras.com.br]
 - **Issues**: [GitHub Issues](https://github.com/atbrandao/rotormtm/issues)
 
 ## 🙏 Acknowledgments
 
-- **UnB / ENM - Group of System Dynamics (GDS)** - Research infrastructure
+- **UnB / ENM - Grupo de Dinâmica de Sistemas (GDS)** - Research infrastructure
 - **ROSS Community** - Base for rotordynamic development
 
 ---

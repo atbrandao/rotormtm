@@ -9,8 +9,7 @@ This folder contains the graphical interfaces developed in Streamlit for working
 - **`interface_rotor_step2.py`** - Step 2 Interface: FRF analysis and results visualization
 
 ### Data Files
-- **`rotor_mtm_3res.pkl`** - Example file with RotorMTM configured with 3 resonators
-- **`rotor_system_3res.pkl`** - Additional example file for testing
+- **`rotor_system_3res.pkl`** - RotorMTM pickled file to use in Interface Step 2
 
 ## How to Use
 
@@ -20,8 +19,7 @@ gui/
 ├── interface_rotor_step1.py    # Step 1 Interface (working)
 ├── interface_rotor_step2.py    # Step 2 Interface (working)  
 ├── README.md                   # This documentation
-├── rotor_mtm_3res.pkl         # RotorMTM example (3 resonators)
-└── rotor_system_3res.pkl      # Additional example for testing
+├── rotor_system_3res.pkl       # RotorMTM example (3 resonators)
 ```
 
 ### Prerequisites
@@ -48,7 +46,7 @@ streamlit run gui/interface_rotor_step2.py
 ### Step 1: Configuration
 1. **Rotor Loading**
    - Use ROSS example
-   - Load from pickle file
+   - Load from ross.Rotor pickle file
    
 2. **Resonator Configuration**
    - Define positions on rotor
