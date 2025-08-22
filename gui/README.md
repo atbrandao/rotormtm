@@ -1,125 +1,125 @@
-# Interface RotorMTM - Pasta GUI
+# RotorMTM Interface - GUI Folder
 
-Esta pasta contém as interfaces gráficas desenvolvidas em Streamlit para trabalhar com o sistema RotorMTM.
+This folder contains the graphical interfaces developed in Streamlit for working with the RotorMTM system.
 
-## Arquivos Disponíveis
+## Available Files
 
-### Interfaces Funcionais
-- **`interface_rotor_step1.py`** - Interface da Etapa 1: Carregamento de rotor e configuração de ressonadores
-- **`interface_rotor_step2.py`** - Interface da Etapa 2: Análise FRF e visualização de resultados
+### Functional Interfaces
+- **`interface_rotor_step1.py`** - Step 1 Interface: Rotor loading and resonator configuration
+- **`interface_rotor_step2.py`** - Step 2 Interface: FRF analysis and results visualization
 
-### Arquivos de Dados
-- **`rotor_mtm_3res.pkl`** - Arquivo exemplo com RotorMTM configurado com 3 ressonadores
-- **`rotor_system_3res.pkl`** - Arquivo exemplo adicional para testes
+### Data Files
+- **`rotor_mtm_3res.pkl`** - Example file with RotorMTM configured with 3 resonators
+- **`rotor_system_3res.pkl`** - Additional example file for testing
 
-## Como Usar
+## How to Use
 
-### Estrutura da Pasta
+### Folder Structure
 ```
 gui/
-├── interface_rotor_step1.py    # Interface Etapa 1 (funcionando)
-├── interface_rotor_step2.py    # Interface Etapa 2 (funcionando)  
-├── README.md                   # Esta documentação
-├── rotor_mtm_3res.pkl         # Exemplo RotorMTM (3 ressonadores)
-└── rotor_system_3res.pkl      # Exemplo adicional para testes
+├── interface_rotor_step1.py    # Step 1 Interface (working)
+├── interface_rotor_step2.py    # Step 2 Interface (working)  
+├── README.md                   # This documentation
+├── rotor_mtm_3res.pkl         # RotorMTM example (3 resonators)
+└── rotor_system_3res.pkl      # Additional example for testing
 ```
 
-### Pré-requisitos
-Certifique-se de que a biblioteca `rotor_mtm` está instalada e acessível:
+### Prerequisites
+Make sure the `rotor_mtm` library is installed and accessible:
 ```python
 from rotor_mtm.rotor_mtm import RotorMTM
 from rotor_mtm.results import LinearResults
 ```
 
-### Executar as Interfaces
+### Run the Interfaces
 
-**Etapa 1 - Configuração do Sistema:**
+**Step 1 - System Configuration:**
 ```bash
 streamlit run gui/interface_rotor_step1.py
 ```
 
-**Etapa 2 - Análise FRF:**
+**Step 2 - FRF Analysis:**
 ```bash
 streamlit run gui/interface_rotor_step2.py
 ```
 
-## Fluxo de Trabalho
+## Workflow
 
-### Etapa 1: Configuração
-1. **Carregamento do Rotor**
-   - Usar exemplo do ROSS
-   - Carregar de arquivo pickle
+### Step 1: Configuration
+1. **Rotor Loading**
+   - Use ROSS example
+   - Load from pickle file
    
-2. **Configuração dos Ressonadores**
-   - Definir posições no rotor
-   - Configurar propriedades (massa, momentos de inércia)
+2. **Resonator Configuration**
+   - Define positions on rotor
+   - Configure properties (mass, moments of inertia)
    
-3. **Construção do RotorMTM**
-   - Definir parâmetros k0 e k1
-   - Construir objeto RotorMTM
-   - Salvar arquivo .pkl para uso na Etapa 2
+3. **RotorMTM Construction**
+   - Define k0 and k1 parameters
+   - Build RotorMTM object
+   - Save .pkl file for use in Step 2
 
-### Etapa 2: Análise FRF
-1. **Carregamento do RotorMTM**
-   - Carregar arquivo .pkl da Etapa 1
+### Step 2: FRF Analysis
+1. **RotorMTM Loading**
+   - Load .pkl file from Step 1
    
-2. **Configuração da Análise**
-   - Definir faixa de velocidades
-   - Configurar parâmetros de excitação
-   - Selecionar DOFs para análise
+2. **Analysis Configuration**
+   - Define speed range
+   - Configure excitation parameters
+   - Select DOFs for analysis
    
-3. **Execução e Visualização**
-   - Executar análise FRF
-   - Visualizar resultados (FRF, órbitas)
-   - Comparar com rotor solo
-   - Salvar resultados
+3. **Execution and Visualization**
+   - Execute FRF analysis
+   - Visualize results (FRF, orbits)
+   - Compare with solo rotor
+   - Save results
 
-## Funcionalidades Principais
+## Main Features
 
-### Interface Etapa 1
-- ✅ Carregamento de rotores (exemplo/arquivo)
-- ✅ Configuração interativa de ressonadores
-- ✅ Visualização 2D do sistema
-- ✅ Construção do RotorMTM
-- ✅ Salvamento de configurações
+### Step 1 Interface
+- ✅ Rotor loading (example/file)
+- ✅ Interactive resonator configuration
+- ✅ 2D system visualization
+- ✅ RotorMTM construction
+- ✅ Configuration saving
 
-### Interface Etapa 2
-- ✅ Carregamento de arquivos RotorMTM
-- ✅ Configuração flexível de análise FRF
-- ✅ Execução paralela (com/sem ressonadores)
-- ✅ Visualização avançada (FRF, órbitas)
-- ✅ Salvamento de resultados LinearResults
+### Step 2 Interface
+- ✅ RotorMTM file loading
+- ✅ Flexible FRF analysis configuration
+- ✅ Parallel execution (with/without resonators)
+- ✅ Advanced visualization (FRF, orbits)
+- ✅ LinearResults saving
 
 ## Troubleshooting
 
-### Erro de Importação
-Se houver erro ao importar `rotor_mtm`, verifique:
-- Biblioteca está instalada: `pip install rotor_mtm`
-- Biblioteca está no PYTHONPATH
-- Versão da biblioteca é compatível
+### Import Error
+If there's an error importing `rotor_mtm`, check:
+- Library is installed: `pip install rotor_mtm`
+- Library is in PYTHONPATH
+- Library version is compatible
 
-### Arquivo não Reconhecido
-Se a Etapa 2 não reconhecer o arquivo da Etapa 1:
-- Verifique se o arquivo foi gerado corretamente pela `interface_rotor_step1.py`
-- Verifique se o arquivo contém objeto RotorMTM válido
-- Teste com arquivo exemplo: `rotor_mtm_3res.pkl`
+### File Not Recognized
+If Step 2 doesn't recognize the file from Step 1:
+- Check if file was generated correctly by `interface_rotor_step1.py`
+- Verify file contains valid RotorMTM object
+- Test with example file: `rotor_mtm_3res.pkl`
 
-## Exemplos de Uso
+## Usage Examples
 
-### Arquivo Teste Disponível
-Utilize o arquivo `rotor_mtm_3res.pkl` como exemplo para testar a Etapa 2 sem precisar configurar um sistema completo.
+### Available Test File
+Use the `rotor_mtm_3res.pkl` file as an example to test Step 2 without needing to configure a complete system.
 
-### Configurações Típicas
-- **k0**: 1e6 N/m (rigidez radial)
-- **k1**: 1e3 N.m/rad (rigidez rotacional) 
-- **Faixa de velocidades**: 0-1000 rad/s
-- **Pontos de análise**: 100 pontos
-- **Força de excitação**: 1 N
+### Typical Configurations
+- **k0**: 1e6 N/m (radial stiffness)
+- **k1**: 1e3 N.m/rad (rotational stiffness) 
+- **Speed range**: 0-1000 rad/s
+- **Analysis points**: 100 points
+- **Excitation force**: 1 N
 
-## Suporte
+## Support
 
-Para problemas ou dúvidas:
-1. Verifique os pré-requisitos de instalação
-2. Consulte os logs de erro no terminal
-3. Teste com arquivos exemplo fornecidos
-4. Verifique a compatibilidade das versões das bibliotecas
+For problems or questions:
+1. Check installation prerequisites
+2. Consult error logs in terminal
+3. Test with provided example files
+4. Check library version compatibility
