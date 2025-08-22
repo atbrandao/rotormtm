@@ -13,11 +13,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# Adicionar o diretório da biblioteca ao path
-rotor_lib_path = Path(__file__).parent / "rotor_mtm_lib"
-if str(rotor_lib_path) not in sys.path:
-    sys.path.append(str(rotor_lib_path))
-
 try:
     from rotor_mtm.rotor_mtm import RotorMTM
     from rotor_mtm.results import LinearResults

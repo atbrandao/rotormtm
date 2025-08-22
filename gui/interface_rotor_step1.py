@@ -16,10 +16,8 @@ import plotly.graph_objects as go
 import sys
 import os
 import warnings
+import pickle
 warnings.filterwarnings('ignore')
-
-# Adicionar o caminho da biblioteca rotor_mtm
-sys.path.append('rotor_mtm_lib')
 
 # Configuração da página
 st.set_page_config(
@@ -49,10 +47,10 @@ def check_dependencies():
     
     # Testar rotor_mtm
     try:
-        from rotor_mtm_lib.rotor_mtm.rotor_mtm import RotorMTM
+        from rotor_mtm.rotor_mtm import RotorMTM
         available_deps.append("rotor_mtm")
     except ImportError:
-        missing_deps.append("rotor_mtm (local)")
+        missing_deps.append("rotor_mtm")
     
     return available_deps, missing_deps
 
@@ -72,7 +70,7 @@ else:
 
 # Importar bibliotecas
 import ross as rs
-from rotor_mtm_lib.rotor_mtm.rotor_mtm import RotorMTM
+from rotor_mtm.rotor_mtm import RotorMTM
 
 # ============================================================================
 # FUNÇÕES AUXILIARES
@@ -213,7 +211,7 @@ def create_rotor_mtm():
 
 # Importar bibliotecas
 import ross as rs
-from rotor_mtm_lib.rotor_mtm.rotor_mtm import RotorMTM
+from rotor_mtm.rotor_mtm import RotorMTM
 
 # Inicializar session state
 if 'rotor' not in st.session_state:

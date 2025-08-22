@@ -13,7 +13,7 @@ sp_arr = Q_(np.arange(1000, 40000, 500), "RPM")
 
 rotor_original = rs.Rotor.load('compressor_rotor.toml')
 
-with open('rotor_dict_v1.pic', 'rb') as file:
+with open('rotor_dict_v3.pic', 'rb') as file:
     rotor_dict = load(file)
 
 r = rotor_dict['r_det_transtun']
