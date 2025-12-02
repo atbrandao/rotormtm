@@ -85,17 +85,19 @@ r_var3_flextun = rmtm.RotorMTM(rotor,n_pos,dk_r,k0*100,k1,var=var,var_k=0,p_damp
 # Rotores com ressonadores translacionais
 r_det_transtun = rmtm.RotorMTM(rotor,n_pos,dk_r,k0,100*k1,var=0,var_k=0,p_damp=1e-4,ge=True),
 r_var1_transtun = rmtm.RotorMTM(rotor,n_pos,dk_r,k0,100*k1,var=var,var_k=0,p_damp=1e-4,ge=True,exp_var=1),
-r_var3_transtun = rmtm.RotorMTM(rotor,n_pos,dk_r,k0,100*k1,var=var,var_k=0,p_damp=1e-4,ge=True,exp_var=3),
+# r_var3_transtun = rmtm.RotorMTM(rotor,n_pos,dk_r,k0,100*k1,var=var,var_k=0,p_damp=1e-4,ge=True,exp_var=3),
 # Rotores com ambos os GDL sintonizados (super bandgap)
-r_det_sbg = rmtm.RotorMTM(rotor,n_pos,dk_r,k0,k1,var=0,var_k=0,p_damp=1e-4,ge=True),
-r_var3_sbg = rmtm.RotorMTM(rotor,n_pos,dk_r,k0,k1,var=var,var_k=0,p_damp=1e-4,ge=True,exp_var=3)
+# r_det_sbg = rmtm.RotorMTM(rotor,n_pos,dk_r,k0,k1,var=0,var_k=0,p_damp=1e-4,ge=True),
+# r_var3_sbg = rmtm.RotorMTM(rotor,n_pos,dk_r,k0,k1,var=var,var_k=0,p_damp=1e-4,ge=True,exp_var=3)
 )
 
 rotor_dict['r_var1_transtun'].plot_rotor().write_image('rotor.svg')
+print(len(rotor_dict['r_var1_transtun'].A(0)))
+print(rotor_dict['r_var1_transtun'].N)
 
 if create_nonlinear:
     r = rotor_dict['r_var1_transtun']
-    Sys0 = r.create_Sys_NL(x_eq0=1e-3, sp=sp_arr[0], cp=1e-4, n_harm=10)
+    Sys0 = r.create_Sys_NL(x_eq0=1e-3, sp=sp_arr[0], n_harm=10)
     # print(Sys.A.shape)
     # print(np.vstack([np.zeros((r.rotor_solo.ndof,1)),
     #                Sys.x_eq*np.ones((r.n_res*4,1)),
@@ -120,8 +122,8 @@ if create_nonlinear:
     for i, sp in enumerate(sp_arr):
         # sp=100
         t0 = time.time()
-        Sys = r.create_Sys_NL(x_eq0=1e-3, sp=sp, cp=1e-4, n_harm=10)
-        # Sys = r.create_Sys_NL(x_eq1=1e-1, sp=sp, cp=1e-4, n_harm=10, nu=1, N=1)
+        Sys = r.create_Sys_NL(x_eq0=1e-3, sp=sp, n_harm=10)
+        # Sys = r.create_Sys_NL(x_eq1=1e-1, sp=sp, n_harm=10, nu=1, N=1)
         z0 = Sys.z0(omg=sp, f_omg={0: 0})
         try:
             x_hb, res = Sys.solve_hb(f, sp, z0=z0, full_output=True, method=None) #, state_space=True)  # 'ls')
@@ -185,19 +187,22 @@ else:
             pickle.dump(out, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     dof_show = 0
-    for k in rotor_dict.keys():
-
+    for k in list(rotor_dict.keys())[1:]:
+        save_full_out(k)    
+    
+    dof_show = 2
+    for k in list(rotor_dict.keys())[:3:2]:
         save_full_out(k)    
 
 
     # dof_show = 0
     # if __name__ == '__main__':
-    #     with Pool(7) as p:
-    #         p.map(save_full_out,list(rotor_dict.keys()))
+    #     with Pool(5) as p:
+    #         p.map(save_full_out, list(rotor_dict.keys()))
 
     # dof_show = 2
     # if __name__ == '__main__':
     #     with Pool(2) as p:
-    #         p.map(save_full_out,list(rotor_dict.keys())[:3:2])
+    #         p.map(save_full_out, list(rotor_dict.keys())[:3:2])
 
 
