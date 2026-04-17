@@ -27,9 +27,9 @@ class Sys_NL:
         """ Nonlinear system class.
         This class implements a nonlinear metastructure with Duffing oscillators.
         The nonlinear system is built from the system's linear matrices, connectivity coordinates
-        and nonlinear Duffin alpha and beta parameters.
-        The class also provided the necessary methods to calculate the system's
-        linear and nonlinear frequency response functions using Harmonic balance and
+        and nonlinear Duffing alpha and beta parameters.
+        The class also provides the necessary methods to calculate the system's
+        linear and nonlinear frequency response functions using Harmonic Balance and
         Runge-Kutta 4th order methods.
 
         Refer to Brandão et al. (2025) and  for further details.
