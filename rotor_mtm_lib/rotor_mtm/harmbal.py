@@ -30,7 +30,7 @@ class Sys_NL:
         and nonlinear Duffin alpha and beta parameters.
         The class also provided the necessary methods to calculate the system's
         linear and nonlinear frequency response functions using Harmonic balance and
-        Runge-Kutte 4th order methods.
+        Runge-Kutta 4th order methods.
 
         Refer to Brandão et al. (2025) and  for further details.
         https://doi.org/10.1007/s11071-025-11597-z
